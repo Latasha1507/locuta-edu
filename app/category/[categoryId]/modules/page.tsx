@@ -1,0 +1,439 @@
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { isAdmin } from '@/lib/admin'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import AchievementBadge from '@/components/AchievementBadge'
+
+const categoryMap: { [key: string]: string } = {
+  'public-speaking': 'Public Speaking',
+  'storytelling': 'Storytelling',
+  'creator-speaking': 'Creator Speaking',
+  'casual-conversation': 'Casual Conversation',
+  'workplace-communication': 'Workplace Communication',
+  'pitch-anything': 'Pitch Anything',
+}
+
+const categoryColors: { [key: string]: string } = {
+  'public-speaking': 'from-purple-500 to-indigo-600',
+  'storytelling': 'from-blue-500 to-cyan-600',
+  'creator-speaking': 'from-pink-500 to-rose-600',
+  'casual-conversation': 'from-green-500 to-emerald-600',
+  'workplace-communication': 'from-indigo-500 to-purple-600',
+  'pitch-anything': 'from-teal-500 to-cyan-600',
+}
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export default async function CategoryModulesPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ categoryId: string }>
+  searchParams: Promise<{ tone?: string; module?: string }>
+}) {
+  const resolvedParams = await params
+  const resolvedSearchParams = await searchParams
+  const { categoryId } = resolvedParams
+  const tone = resolvedSearchParams.tone || 'Normal'
+  const currentModuleParam = resolvedSearchParams.module || '1'
+  const currentModuleNumber = parseInt(currentModuleParam)
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/auth/login')
+  }
+  
+  const categoryName = categoryMap[categoryId]
+  const isUserAdmin = await isAdmin()
+  if (!categoryName) {
+    notFound()
+  }
+
+  const { data: lessons } = await supabase
+    .from('lessons')
+    .select('*')
+    .eq('category', categoryName)
+    .order('module_number')
+    .order('level_number')
+
+  const modules: { [key: number]: any[] } = {}
+  lessons?.forEach((lesson) => {
+    if (!modules[lesson.module_number]) {
+      modules[lesson.module_number] = []
+    }
+    modules[lesson.module_number].push(lesson)
+  })
+
+  const { data: progress } = await supabase
+    .from('user_progress')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('category', categoryName)
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const progressMap: { [key: string]: any } = {}
+  progress?.forEach((p) => {
+    progressMap[`${p.module_number}-${p.level_number}`] = p
+  })
+
+  // 🔍 ADD THIS DEBUG
+console.log('📚 Module Page Progress Debug:', {
+  categoryName,
+  totalProgressRecords: progress?.length || 0,
+  progressMap,
+  completedCount: progress?.filter(p => p.completed).length || 0,
+  allProgress: progress
+})
+  const totalLessons = lessons?.length || 0
+  const completedLessons = progress?.filter(p => p.completed).length || 0
+  const overallProgress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+  // 🔍 MORE DEBUG
+console.log('📊 Calculated Progress:', {
+  totalLessons,
+  completedLessons,
+  overallProgress
+})
+  const gradientColor = categoryColors[categoryId] || 'from-purple-500 to-indigo-600'
+
+  const normalizeString = (value?: string | null) =>
+    typeof value === 'string' ? value.toLowerCase() : ''
+
+  const normalizedPlanType = normalizeString(
+    (profile as any)?.plan_type || (profile as any)?.plan || (profile as any)?.tier
+  )
+  const normalizedSubscriptionStatus = normalizeString(
+    (profile as any)?.subscription_status ||
+      (profile as any)?.plan_status ||
+      (profile as any)?.membership_status
+  )
+  const trialEndsAt =
+    (profile as any)?.trial_ends_at ||
+    (profile as any)?.trial_end ||
+    (profile as any)?.trialEndsAt ||
+    (profile as any)?.trialEnds ||
+    null
+  const isTrialActive = trialEndsAt ? new Date(trialEndsAt).getTime() > Date.now() : false
+  const hasLifetimeAccess = Boolean(
+    (profile as any)?.lifetime_access ||
+      (profile as any)?.founder_access ||
+      (profile as any)?.beta_access ||
+      (profile as any)?.pro_access
+  )
+  const hasActiveSubscriptionFlag = Boolean(
+    (profile as any)?.has_active_subscription ||
+      (profile as any)?.active_subscription ||
+      (profile as any)?.is_subscription_active
+  )
+
+  const hasFullAccess =
+    isUserAdmin ||
+    hasLifetimeAccess ||
+    hasActiveSubscriptionFlag ||
+    isTrialActive ||
+    ['pro', 'paid', 'premium', 'founder', 'lifetime'].includes(normalizedPlanType) ||
+    ['active', 'trialing'].includes(normalizedSubscriptionStatus)
+
+  const isModuleUnlocked = (moduleNum: number): boolean => {
+    if (isUserAdmin) return true
+    if (moduleNum === 1) return true
+
+    if (!hasFullAccess) return false
+
+    const previousModule = modules[moduleNum - 1]
+    if (!previousModule) return true
+
+    const allPreviousCompleted = previousModule.every(
+      (lesson) => progressMap[`${moduleNum - 1}-${lesson.level_number}`]?.completed
+    )
+
+    return allPreviousCompleted
+  }
+
+  const moduleNumbers = Object.keys(modules).map(Number).sort((a, b) => a - b)
+  const currentModule = moduleNumbers.includes(currentModuleNumber) 
+    ? currentModuleNumber 
+    : moduleNumbers[0]
+  
+  const currentModuleIndex = moduleNumbers.indexOf(currentModule)
+  const hasNextModule = currentModuleIndex < moduleNumbers.length - 1
+  const hasPrevModule = currentModuleIndex > 0
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+            <Link
+              href={`/category/${categoryId}/tone`}
+              className="text-gray-600 hover:text-gray-900 transition-colors flex-shrink-0"
+            >
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </Link>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">{categoryName}</h1>
+              <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                {moduleNumbers.length} modules • {totalLessons} lessons • {tone} Tone
+              </p>
+            </div>
+            <div className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl shadow-lg w-full sm:w-auto">
+              <div className="text-xs sm:text-sm font-medium opacity-90">Overall Progress</div>
+              <div className="text-2xl sm:text-3xl font-bold">{overallProgress}%</div>
+              <div className="text-xs opacity-75">{completedLessons}/{totalLessons} lessons</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
+        {isUserAdmin && (
+          <div className="mb-4 sm:mb-6 bg-purple-50 border-2 border-purple-200 rounded-xl p-3 sm:p-4 shadow-lg">
+            <p className="text-purple-900 font-semibold flex flex-wrap items-center gap-2 text-sm sm:text-base">
+              🔑 <span>Admin Mode:</span> <span className="text-purple-600">All lessons unlocked for testing</span>
+            </p>
+          </div>
+        )}
+
+        {!hasFullAccess && (
+          <div className="rounded-xl border border-orange-200/70 bg-white shadow-sm px-4 sm:px-5 py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-2xl flex-shrink-0">🔒</div>
+                <div>
+                  <p className="text-sm sm:text-base font-semibold text-orange-900">
+                    Keep your streak going, unlock every module with Pro!
+                  </p>
+                  <p className="text-xs sm:text-sm text-orange-700">
+                    The free plan covers Module 1; Modules 2+ open up as soon as you upgrade.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/pricing"
+                className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-2 text-sm font-semibold text-white shadow hover:from-orange-600 hover:to-amber-600 transition self-end sm:self-auto"
+              >
+                Upgrade to Pro
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {moduleNumbers.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 lg:p-12 text-center border border-gray-200">
+            <div className="text-4xl sm:text-6xl mb-4">📚</div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">No lessons yet</h2>
+            <p className="text-sm sm:text-base text-gray-600 mb-6">Lessons for this category are coming soon!</p>
+            <Link href="/dashboard" className="inline-block px-4 sm:px-6 py-2 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm sm:text-base font-medium rounded-lg transition shadow-lg">
+              Back to Dashboard
+            </Link>
+          </div>
+        ) : (
+          <>
+            {moduleNumbers.map((moduleNumber) => {
+              if (moduleNumber !== currentModule) return null
+
+              const moduleLessons = modules[moduleNumber]
+              const moduleTitle = moduleLessons[0]?.module_title || `Module ${moduleNumber}`
+              const completedCount = moduleLessons.filter(
+                (lesson) => progressMap[`${moduleNumber}-${lesson.level_number}`]?.completed
+              ).length
+              const moduleProgress = Math.round((completedCount / moduleLessons.length) * 100)
+              const isUnlocked = isModuleUnlocked(moduleNumber)
+
+              return (
+                <div key={moduleNumber} className="space-y-4">
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
+                    <Link
+                      href={hasPrevModule ? `?tone=${tone}&module=${moduleNumbers[currentModuleIndex - 1]}` : '#'}
+                      className={`flex items-center justify-center w-10 h-10 rounded-full transition-all shadow ${
+                        hasPrevModule
+                          ? 'bg-white hover:bg-purple-50 text-purple-600 hover:scale-105 border border-purple-200'
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </Link>
+                    <span className="text-sm text-gray-600 font-medium">Module {currentModule} of {moduleNumbers.length}</span>
+                    <Link
+                      href={hasNextModule ? `?tone=${tone}&module=${moduleNumbers[currentModuleIndex + 1]}` : '#'}
+                      className={`flex items-center justify-center w-10 h-10 rounded-full transition-all shadow ${
+                        hasNextModule
+                          ? 'bg-white hover:bg-purple-50 text-purple-600 hover:scale-105 border border-purple-200'
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                  </div>
+
+                  <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300">
+                    <div className={`bg-gradient-to-r ${gradientColor} px-5 py-5 text-white relative`}>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs uppercase tracking-wide text-white/80 mb-1">Module {moduleNumber}</p>
+                          <h2 className="text-xl sm:text-2xl font-bold truncate">{moduleTitle}</h2>
+                        </div>
+                        <div className="text-left sm:text-right">
+                          <div className="text-3xl font-bold">{moduleProgress}%</div>
+                          <p className="text-xs text-white/90">Complete</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 bg-white/20 h-2 rounded-full overflow-hidden backdrop-blur-sm">
+                        <div 
+                          className="h-full bg-white rounded-full transition-all duration-500 shadow-lg" 
+                          style={{ width: `${moduleProgress}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-white/90 mt-2">{completedCount} of {moduleLessons.length} lessons completed</p>
+                    </div>
+
+                    <div className="p-4 sm:p-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+                        {moduleLessons.map((lesson) => {
+                            const lessonProgress = progressMap[`${moduleNumber}-${lesson.level_number}`]
+                            const isCompleted = lessonProgress?.completed || false
+                            const bestScore = lessonProgress?.best_score || null
+                            
+                            const isLessonUnlocked = (() => {
+                              if (isUserAdmin) return true
+                              if (moduleNumber === 1) return true
+                              if (moduleNumber > 1) {
+                                if (!hasFullAccess) {
+                                  return false
+                                }
+                                const previousModule = modules[moduleNumber - 1]
+                                if (!previousModule) return true
+                                const allPreviousCompleted = previousModule.every(
+                                  (prevLesson) => progressMap[`${moduleNumber - 1}-${prevLesson.level_number}`]?.completed
+                                )
+                                return allPreviousCompleted
+                              }
+                              return false
+                            })()
+
+                            const LessonCard = (
+                              <div
+                                key={lesson.id}
+                                className={`group relative bg-white border rounded-lg sm:rounded-xl p-3 sm:p-4 transition-all duration-300 ${
+                                  isLessonUnlocked 
+                                    ? 'border-gray-200 hover:border-purple-300 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer' 
+                                    : 'border-gray-200 cursor-not-allowed opacity-60'
+                                }`}
+                              >
+                                {!isLessonUnlocked && (
+                                  <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
+                                    <div className="bg-gray-200 text-gray-600 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                      <span>🔒</span>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {isCompleted && isLessonUnlocked && bestScore && (
+                                  <div className="absolute top-3 right-3 flex items-center gap-2">
+                                    <AchievementBadge score={bestScore} />
+                                  </div>
+                                )}
+
+                                <div className="flex items-start gap-3">
+                                  <div className={`relative w-11 h-11 sm:w-14 sm:h-14 rounded-lg flex items-center justify-center font-bold text-base sm:text-xl flex-shrink-0 transition-all duration-300 shadow ${
+                                    isCompleted && isLessonUnlocked
+                                      ? 'bg-gradient-to-br from-green-400 to-emerald-500 text-white' 
+                                      : isLessonUnlocked
+                                      ? 'bg-gradient-to-br from-purple-50 to-indigo-100 text-purple-700 group-hover:from-purple-100 group-hover:to-indigo-200'
+                                      : 'bg-gradient-to-br from-gray-100 to-gray-200 text-gray-500'
+                                  }`}>
+                                    {isCompleted && isLessonUnlocked ? (
+                                      <span className="text-xl sm:text-2xl">✓</span>
+                                    ) : (
+                                      lesson.level_number
+                                    )}
+                                    {isCompleted && isLessonUnlocked && bestScore && bestScore >= 80 && (
+                                      <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-6 h-6 sm:w-8 sm:h-8 bg-yellow-400 rounded-full flex items-center justify-center animate-bounce">
+                                        <span className="text-xs sm:text-lg">{bestScore >= 90 ? '⭐' : '🏆'}</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className={`font-semibold text-sm sm:text-base mb-1 transition-colors leading-snug ${
+                                      isLessonUnlocked ? 'text-gray-900 group-hover:text-purple-600' : 'text-gray-600'
+                                    }`}>
+                                      {lesson.level_title}
+                                    </h3>
+                                    <p className={`text-xs sm:text-sm line-clamp-2 leading-relaxed mb-3 ${
+                                      isLessonUnlocked ? 'text-gray-600' : 'text-gray-500'
+                                    }`}>
+                                      {lesson.lesson_explanation}
+                                    </p>
+                                    
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold ${
+                                          isCompleted && isLessonUnlocked
+                                            ? 'bg-green-100 text-green-700' 
+                                            : isLessonUnlocked
+                                            ? 'bg-gray-100 text-gray-600'
+                                            : 'bg-gray-100 text-gray-500'
+                                        }`}>
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                          </svg>
+                                          <span className="font-bold">{lesson.expected_duration_sec}s</span>
+                                        </div>
+
+                                        {bestScore && isLessonUnlocked && (
+                                          <div className="inline-flex items-center gap-1 bg-gradient-to-r from-purple-50 to-indigo-100 text-purple-700 px-2 py-0.5 rounded-lg text-[11px] font-semibold">
+                                            <span>Best:</span>
+                                            <span className="font-bold">{bestScore}/100</span>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {isLessonUnlocked && (
+                                        <svg className="w-5 h-5 text-gray-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+
+                            return isLessonUnlocked ? (
+                              <Link
+                                key={lesson.id}
+                                href={`/category/${categoryId}/module/${moduleNumber}/lesson/${lesson.level_number}/practice?tone=${tone}`}
+                              >
+                                {LessonCard}
+                              </Link>
+                            ) : (
+                              LessonCard
+                            )
+                          })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </>
+        )}
+      </main>
+    </div>
+  )
+}
