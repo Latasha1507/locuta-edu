@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import ToneSelector from '@/components/ToneSelector';
 
 const categoryMap: { [key: string]: string } = {
   'public-speaking': 'Public Speaking',
@@ -12,63 +11,6 @@ const categoryMap: { [key: string]: string } = {
   'workplace-communication': 'Workplace Communication',
   'pitch-anything': 'Pitch Anything',
 }
-// Updated tone configuration with new voices
-const tones = [
-  {
-    id: 'Normal',
-    name: 'Normal',
-    voice: 'shimmer',
-    description: 'Clear, simple, everyday conversational style',
-    icon: '💬',
-    borderGradient: 'from-indigo-400 to-purple-500',
-    bgGradient: 'from-indigo-50 to-purple-50',
-  },
-  {
-    id: 'Supportive',
-    name: 'Supportive',
-    voice: 'nova',
-    description: 'Soft, kind, reassuring - like a supportive friend',
-    icon: '🤗',
-    borderGradient: 'from-blue-400 to-indigo-500',
-    bgGradient: 'from-blue-50 to-indigo-50',
-  },
-  {
-    id: 'Inspiring',
-    name: 'Inspiring',
-    voice: 'sage',
-    description: 'Energizing and passionate - like a motivational coach',
-    icon: '⚡',
-    borderGradient: 'from-purple-400 to-pink-500',
-    bgGradient: 'from-purple-50 to-pink-50',
-  },
-  {
-    id: 'Funny',
-    name: 'Funny',
-    voice: 'coral',
-    description: 'Entertaining, playful, casual with light humor',
-    icon: '😄',
-    borderGradient: 'from-yellow-400 to-lime-500',
-    bgGradient: 'from-yellow-50 to-lime-50',
-  },
-  {
-    id: 'Diplomatic',
-    name: 'Diplomatic',
-    voice: 'nova',
-    description: 'Calm, professional, trustworthy - balanced approach',
-    icon: '🤝',
-    borderGradient: 'from-cyan-400 to-teal-500',
-    bgGradient: 'from-cyan-50 to-teal-50',
-  },
-  {
-    id: 'Bossy',
-    name: 'Bossy',
-    voice: 'ash',
-    description: 'Commanding, no-nonsense, authoritative leadership',
-    icon: '👔',
-    borderGradient: 'from-indigo-500 to-purple-600',
-    bgGradient: 'from-indigo-50 to-purple-50',
-  },
-]
 
 export default async function LessonToneSelectionPage({
   params,
@@ -170,24 +112,37 @@ export default async function LessonToneSelectionPage({
           </div>
         </div>
 
-        {/* Tone Selection */}
-        <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-200">
+        {/* Start Practice Button - REMOVED TONE SELECTION */}
+        <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-200 text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-3">
-            Choose Your AI Coach Tone
+            Ready to Practice?
           </h2>
           <p className="text-gray-600 mb-8">
-            Select how you'd like your AI coach to communicate with you during this lesson
+            Click below to start your speaking practice session
           </p>
 
-          <ToneSelector
-            tones={tones}
-            categoryId={categoryId}
-            moduleId={moduleId}
-            lessonId={lessonId}
-            lesson={lesson}
-            categoryName={categoryName}
-          />
-        </div> 
+          <Link
+            href={`/category/${categoryId}/module/${moduleId}/lesson/${lessonId}/practice`}
+            className="inline-flex items-center justify-center gap-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 text-lg"
+          >
+            <span>🎤</span>
+            Start Practice
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 7l5 5m0 0l-5 5m5-5H6"
+              />
+            </svg>
+          </Link>
+        </div>
+
         {/* Tips Section */}
         <div className="mt-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
           <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">

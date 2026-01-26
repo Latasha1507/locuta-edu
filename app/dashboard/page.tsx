@@ -2,54 +2,22 @@
 
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import Mixpanel from '@/lib/mixpanel';
 import { useEffect, useState } from 'react';
-import CategoryCardTracking from '@/components/CategoryCardTracking';
 import { isAdminClient } from '@/lib/admin-client';
-import TrialWelcomeModal from '@/components/TrialWelcomeModal';
-import OnboardingForm from '@/components/OnboardingForm';
-import TrialStatusBadge from '@/components/TrialStatusBadge';
-import FounderCallButton from '@/components/FounderCallButton'
 
-function AnimatedRadialProgress({ percentage, size = 72, color = "#8b5cf6", bg = "#e9e9f3" }: { percentage: number, size?: number, color?: string, bg?: string }) {
+function AnimatedRadialProgress({ percentage, size = 72 }: { percentage: number, size?: number }) {
   const radius = (size - 8) / 2
   const circ = 2 * Math.PI * radius
   const progress = Math.max(0, Math.min(1, percentage / 100))
   return (
     <svg width={size} height={size} className="overflow-visible">
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#e9e9f3" strokeWidth={8} opacity={0.3} />
       <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke={bg}
-        strokeWidth={8}
-        opacity={0.3}
-      />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke={color}
-        strokeWidth={8}
-        strokeLinecap="round"
-        strokeDasharray={circ}
-        strokeDashoffset={circ * (1 - progress)}
+        cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#8b5cf6" strokeWidth={8}
+        strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ * (1 - progress)}
         style={{ transition: 'stroke-dashoffset 1s cubic-bezier(0.4, 0.2, 0.2, 1)' }}
       />
-      <text
-        x="50%" y="54%"
-        textAnchor="middle"
-        alignmentBaseline="middle"
-        fontSize={size * 0.34}
-        fontWeight="bold"
-        className="fill-slate-900"
-        style={{
-          fontFamily: 'inherit',
-          transition: 'fill 0.2s'
-        }}
-      >
+      <text x="50%" y="54%" textAnchor="middle" alignmentBaseline="middle" fontSize={size * 0.34} fontWeight="bold" className="fill-slate-900">
         {percentage}%
       </text>
     </svg>
@@ -60,24 +28,20 @@ const sidebarLinks = [
   {
     name: 'Dashboard',
     href: '/dashboard',
-    icon: (
-      <svg width={21} height={21} fill="none" stroke="currentColor" className="w-6 h-6" strokeWidth="1.5" viewBox="0 0 24 24">
-        <rect x="3" y="3" width="7" height="7" rx="2" />
-        <rect x="14" y="3" width="7" height="7" rx="2" />
-        <rect x="14" y="14" width="7" height="7" rx="2" />
-        <rect x="3" y="14" width="7" height="7" rx="2" />
-      </svg>
-    )
+    icon: <svg width={21} height={21} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="7" height="7" rx="2" />
+      <rect x="14" y="3" width="7" height="7" rx="2" />
+      <rect x="14" y="14" width="7" height="7" rx="2" />
+      <rect x="3" y="14" width="7" height="7" rx="2" />
+    </svg>
   },
   {
     name: 'Practice History',
     href: '/history',
-    icon: (
-      <svg width={21} height={21} fill="none" stroke="currentColor" className="w-6 h-6" strokeWidth="1.5" viewBox="0 0 24 24">
-        <path d="M12 8v5l3 3" strokeLinecap="round" strokeLinejoin="round"/>
-        <circle cx="12" cy="12" r="9" />
-      </svg>
-    )
+    icon: <svg width={21} height={21} fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+      <path d="M12 8v5l3 3" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="12" cy="12" r="9" />
+    </svg>
   },
 ]
 
@@ -87,19 +51,13 @@ export default function DashboardPage() {
   const [progress, setProgress] = useState<any[]>([]);
   const [lessons, setLessons] = useState<any[]>([]);
   const [allSessions, setAllSessions] = useState<any[]>([]);
-  const [recentSessions, setRecentSessions] = useState<any[]>([]);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
-  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [gradeLevel, setGradeLevel] = useState<number | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
-      const startTime = Date.now();
-      
       try {
-        console.log('🔄 [1/7] Starting dashboard load...');
         const supabase = createClient();
-
         const { data: { user } } = await supabase.auth.getUser();
         
         if (!user) {
@@ -107,68 +65,29 @@ export default function DashboardPage() {
           return;
         }
 
-        console.log(`✅ [${Date.now() - startTime}ms] User authenticated`);
         setUser(user);
         
-        // Check onboarding status FIRST
+        // Get user's grade level from profile
         const { data: profile } = await supabase
           .from('profiles')
-          .select('onboarding_completed, trial_started_at, trial_sessions_used')
+          .select('grade_level')
           .eq('id', user.id)
           .single()
         
-        // If onboarding not complete, show onboarding form
-        if (profile && !profile.onboarding_completed) {
-          console.log('📝 User needs onboarding');
-          setNeedsOnboarding(true);
-          setLoading(false);
-          return;
-        }
+        setGradeLevel(profile?.grade_level || null);
         
-        // Check if we should show welcome modal (after onboarding)
-        if (profile?.trial_started_at && profile?.trial_sessions_used === 0) {
-          const trialStartTime = new Date(profile.trial_started_at).getTime();
-          const now = Date.now();
-          const timeSinceTrialStart = now - trialStartTime;
-          
-          // Show welcome modal if trial started in last 5 minutes
-          if (timeSinceTrialStart < 300000) {
-            setShowWelcomeModal(true);
-          }
-        }
+        // Admin check
+        isAdminClient().then(setIsUserAdmin).catch(() => setIsUserAdmin(false));
         
-        // Admin check (non-blocking)
-        isAdminClient().then(adminStatus => {
-          setIsUserAdmin(adminStatus);
-          console.log(`✅ Admin status: ${adminStatus}`);
-        }).catch(() => setIsUserAdmin(false));
-        
-        // Mixpanel (non-blocking)
-        try {
-          Mixpanel.identify(user.id);
-          Mixpanel.people.set({
-            $email: user.email,
-            $name: user.user_metadata?.full_name || user.email,
-            'Sign up date': user.created_at,
-            'Last login': new Date().toISOString(),
-          });
-          Mixpanel.track('User Logged In', { method: 'google' });
-        } catch (err) {
-          console.warn('⚠️ Mixpanel tracking failed (non-critical)');
-        }
-
-        console.log(`🔄 [${Date.now() - startTime}ms] Fetching data in parallel...`);
-        
-        const [progressResult, lessonsResult, recentSessionsResult] = await Promise.all([
+        // Fetch data
+        const [progressResult, lessonsResult, sessionsResult] = await Promise.all([
           supabase
             .from('user_progress')
             .select('category, module_number, level_number, completed, best_score')
             .eq('user_id', user.id),
-          
           supabase
             .from('lessons')
             .select('category, module_number, level_number'),
-          
           supabase
             .from('sessions')
             .select('id, overall_score, created_at, category')
@@ -177,54 +96,13 @@ export default function DashboardPage() {
             .limit(50)
         ]);
 
-        console.log(`✅ [${Date.now() - startTime}ms] All data fetched`);
-
-        const progressData = progressResult.data || [];
-        const lessonsData = lessonsResult.data || [];
-        const sessionsData = recentSessionsResult.data || [];
-
-        setProgress(progressData);
-        setLessons(lessonsData);
-        setAllSessions(sessionsData);
-        setRecentSessions(sessionsData.slice(0, 10));
-
-        const completedCount = progressData.filter((p: any) => p.completed).length;
-        const isFirstTime = completedCount === 0;
-        
-        if (isFirstTime) {
-          try {
-            Mixpanel.people.setOnce({
-              'First Time User': true,
-              'First Login Date': new Date().toISOString()
-            });
-            
-            const signupTime = new Date(user.created_at).getTime();
-            const timeFromSignup = Date.now() - signupTime;
-            
-            Mixpanel.track('First Time Dashboard Visit', {
-              time_from_signup_minutes: Math.round(timeFromSignup / 1000 / 60),
-              time_from_signup_hours: Math.round(timeFromSignup / 1000 / 60 / 60)
-            });
-          } catch (err) {
-            console.warn('⚠️ First-time tracking failed (non-critical)');
-          }
-        } else {
-          try {
-            Mixpanel.people.set({
-              'First Time User': false,
-              'Total Lessons Completed': completedCount
-            });
-          } catch (err) {
-            console.warn('⚠️ User property update failed (non-critical)');
-          }
-        }
-
-        const totalTime = Date.now() - startTime;
-        console.log(`🎉 [${totalTime}ms] Dashboard loaded successfully!`);
+        setProgress(progressResult.data || []);
+        setLessons(lessonsResult.data || []);
+        setAllSessions(sessionsResult.data || []);
         setLoading(false);
 
       } catch (err) {
-        console.error('❌ Dashboard load error:', err);
+        console.error('Dashboard load error:', err);
         setLoading(false);
       }
     };
@@ -232,70 +110,39 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
-  // Show onboarding if needed
-  if (needsOnboarding && user) {
-    return (
-      <OnboardingForm 
-        userId={user.id} 
-        onComplete={() => {
-          setNeedsOnboarding(false);
-          setShowWelcomeModal(true); // Show welcome modal after onboarding
-          window.location.reload();
-        }} 
-      />
-    );
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen w-full bg-gradient-to-tr from-[#edf2f7] to-[#f7f9fb] flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600 mb-4"></div>
           <p className="text-xl font-semibold text-slate-700">Loading dashboard...</p>
-          <p className="text-sm text-slate-500 mt-2">This should only take a moment</p>
         </div>
       </div>
     );
   }
 
-  const categories = [
-    {
-      id: 'public-speaking',
-      name: 'Public Speaking',
-      description: 'Master presentations, speeches, and public events',
-      icon: '🎤'
-    },
-    {
-      id: 'storytelling',
-      name: 'Storytelling',
-      description: 'Craft compelling narratives that captivate audiences',
-      icon: '📖'
-    },
-    {
-      id: 'creator-speaking',
-      name: 'Creator Speaking',
-      description: 'Engage with your audience through video content',
-      icon: '🎥'
-    },
-    {
-      id: 'casual-conversation',
-      name: 'Casual Conversation',
-      description: 'Build confidence in everyday social interactions',
-      icon: '💬'
-    },
-    {
-      id: 'workplace-communication',
-      name: 'Workplace Communication',
-      description: 'Excel in meetings, presentations, and team discussions',
-      icon: '💼'
-    },
-    {
-      id: 'pitch-anything',
-      name: 'Pitch Anything',
-      description: 'Master the art of persuasive pitching in any context',
-      icon: '💰'
-    }
-  ]
+  // B2B Categories - filtered by grade level
+  const getCategories = () => {
+    const middleSchoolCategories = [
+      { id: 'public-speaking-fundamentals', name: 'Public Speaking Fundamentals', description: 'Master presentations, speeches, and public events', icon: '🎤', color: 'from-purple-400 to-pink-500' },
+      { id: 'storytelling', name: 'Storytelling', description: 'Craft compelling narratives that captivate audiences', icon: '📖', color: 'from-blue-400 to-cyan-500' },
+      { id: 'leadership-team-communication', name: 'Leadership & Team Communication', description: 'Build confidence in leading groups and teams', icon: '👥', color: 'from-green-400 to-emerald-500' },
+      { id: 'conversation-skills', name: 'Conversation Skills', description: 'Build confidence in everyday social interactions', icon: '💬', color: 'from-yellow-400 to-orange-500' },
+      { id: 'project-academic-presentation', name: 'Project & Academic Presentation Skills', description: 'Excel in classroom presentations and projects', icon: '📊', color: 'from-red-400 to-pink-500' }
+    ];
+
+    const highSchoolCategories = [
+      { id: 'public-speaking-mastery', name: 'Public Speaking Mastery', description: 'Advanced presentation and speech techniques', icon: '🎤', color: 'from-purple-400 to-indigo-600' },
+      { id: 'advanced-storytelling', name: 'Advanced Storytelling & Content', description: 'Create impactful narratives for various audiences', icon: '📖', color: 'from-blue-400 to-purple-500' },
+      { id: 'leadership-team-advanced', name: 'Leadership & Team Communication (Advanced)', description: 'Lead teams and facilitate productive discussions', icon: '👥', color: 'from-green-400 to-teal-500' },
+      { id: 'content-creation-digital', name: 'Content Creation & Digital Communication', description: 'Engage with audiences through digital platforms', icon: '🎥', color: 'from-pink-400 to-rose-500' }
+    ];
+
+    if (!gradeLevel) return middleSchoolCategories;
+    return (gradeLevel >= 5 && gradeLevel <= 8) ? middleSchoolCategories : highSchoolCategories;
+  };
+
+  const categories = getCategories();
 
   const categoryStats = categories.map(category => {
     const categoryLessons = lessons?.filter((l: any) => 
@@ -303,56 +150,23 @@ export default function DashboardPage() {
     ) || []
     
     const totalLessons = categoryLessons.length
-    
     const categoryProgress = progress?.filter((p: any) => 
       p.category.toLowerCase().replace(/\s+/g, '-') === category.id
     ) || []
     
     const completedLessons = categoryProgress.filter((p: any) => p.completed).length
-    // 🔍 ADD THIS DEBUG LOG
-    if (category.id === 'creator-speaking') {
-      console.log('🎥 Creator Speaking Debug:', {
-        totalLessons,
-        categoryProgress: categoryProgress.length,
-        completedLessons,
-        progressItems: categoryProgress,
-        completedItems: categoryProgress.filter((p: any) => p.completed)
-      })
-    }
-    const completionPercentage = totalLessons > 0 
-      ? Math.round((completedLessons / totalLessons) * 100) 
-      : 0
-    
-    const bestScore = categoryProgress.length > 0
-      ? Math.max(...categoryProgress.map((p: any) => p.best_score || 0))
-      : 0
-    
+    const completionPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+    const bestScore = categoryProgress.length > 0 ? Math.max(...categoryProgress.map((p: any) => p.best_score || 0)) : 0
     const hasStarted = completedLessons > 0
 
-    return {
-      ...category,
-      totalLessons,
-      completedLessons,
-      completionPercentage,
-      bestScore,
-      hasStarted
-    }
+    return { ...category, totalLessons, completedLessons, completionPercentage, bestScore, hasStarted }
   })
 
   const totalCompleted = progress?.filter((p: any) => p.completed).length || 0
   const totalAvailable = lessons?.length || 0
-  // 🔍 DEBUG: Check what data we're getting
-console.log('📊 Dashboard Progress Debug:', {
-  totalProgress: progress?.length || 0,
-  completedProgress: totalCompleted,
-  totalLessons: totalAvailable,
-  sampleProgress: progress?.slice(0, 3), // Show first 3 progress records
-  completedItems: progress?.filter((p: any) => p.completed)
-})
-  const overallPercentage = totalAvailable > 0 
-    ? Math.round((totalCompleted / totalAvailable) * 100) 
-    : 0
+  const overallPercentage = totalAvailable > 0 ? Math.round((totalCompleted / totalAvailable) * 100) : 0
 
+  // Gamification: Calculate streak
   const calculateStreak = () => {
     if (!allSessions || allSessions.length === 0) return 0
     
@@ -378,106 +192,59 @@ console.log('📊 Dashboard Progress Debug:', {
     return streak
   }
 
-  const calculateWeeklyActivity = () => {
-    if (!allSessions) return { completed: 0, goal: 7, percentage: 0 }
+  // Gamification: Get level and XP
+  const getLevelAndXP = () => {
+    const xpPerLesson = 10
+    const totalXP = totalCompleted * xpPerLesson
+    const level = Math.floor(totalXP / 100) + 1
+    const xpInCurrentLevel = totalXP % 100
+    const xpToNextLevel = 100 - xpInCurrentLevel
     
-    const today = new Date()
-    const startOfWeek = new Date(today)
-    startOfWeek.setDate(today.getDate() - today.getDay())
-    startOfWeek.setHours(0, 0, 0, 0)
-    
-    const weeklySessions = allSessions.filter((s: any) => {
-      const sessionDate = new Date(s.created_at)
-      return sessionDate >= startOfWeek
-    })
-    
-    const completed = weeklySessions.length
-    const goal = 7
-    const percentage = Math.min(100, Math.round((completed / goal) * 100))
-    
-    return { completed, goal, percentage }
+    return { level, xpInCurrentLevel, xpToNextLevel, totalXP }
   }
 
-  const calculateScoreTrend = () => {
-    if (!recentSessions || recentSessions.length < 2) return { trend: 0, avgRecent: 0, avgPrevious: 0 }
+  // Gamification: Get badges
+  const getBadges = () => {
+    const badges = []
+    if (totalCompleted >= 1) badges.push({ name: 'First Steps', icon: '🌟', color: 'bg-yellow-100 text-yellow-700' })
+    if (totalCompleted >= 10) badges.push({ name: 'Speaker', icon: '🎤', color: 'bg-purple-100 text-purple-700' })
+    if (totalCompleted >= 25) badges.push({ name: 'Communicator', icon: '💬', color: 'bg-blue-100 text-blue-700' })
+    if (totalCompleted >= 50) badges.push({ name: 'Master', icon: '🏆', color: 'bg-orange-100 text-orange-700' })
+    if (calculateStreak() >= 3) badges.push({ name: '3-Day Streak', icon: '🔥', color: 'bg-red-100 text-red-700' })
+    if (calculateStreak() >= 7) badges.push({ name: 'Week Warrior', icon: '⚡', color: 'bg-green-100 text-green-700' })
+    const perfectScores = progress.filter((p: any) => p.best_score >= 90).length
+    if (perfectScores >= 5) badges.push({ name: 'Perfectionist', icon: '✨', color: 'bg-pink-100 text-pink-700' })
     
-    const midPoint = Math.floor(recentSessions.length / 2)
-    const recent = recentSessions.slice(0, midPoint)
-    const previous = recentSessions.slice(midPoint)
-    
-    const avgRecent = recent.reduce((sum: number, s: any) => sum + (s.overall_score || 0), 0) / recent.length
-    const avgPrevious = previous.reduce((sum: number, s: any) => sum + (s.overall_score || 0), 0) / previous.length
-    
-    return {
-      trend: avgRecent > avgPrevious ? 1 : avgRecent < avgPrevious ? -1 : 0,
-      avgRecent: Math.round(avgRecent),
-      avgPrevious: Math.round(avgPrevious)
-    }
-  }
-
-  const calculateStudyTime = () => {
-    if (!allSessions) return { weekly: 0, monthly: 0 }
-    
-    const today = new Date()
-    const startOfWeek = new Date(today)
-    startOfWeek.setDate(today.getDate() - today.getDay())
-    startOfWeek.setHours(0, 0, 0, 0)
-    
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-    
-    const avgMinutesPerSession = 2.5
-    
-    const weeklySessions = allSessions.filter((s: any) => {
-      const sessionDate = new Date(s.created_at)
-      return sessionDate >= startOfWeek
-    }).length
-    
-    const monthlySessions = allSessions.filter((s: any) => {
-      const sessionDate = new Date(s.created_at)
-      return sessionDate >= startOfMonth
-    }).length
-    
-    return {
-      weekly: Math.round(weeklySessions * avgMinutesPerSession),
-      monthly: Math.round(monthlySessions * avgMinutesPerSession)
-    }
+    return badges
   }
 
   const currentStreak = calculateStreak()
-  const weeklyActivity = calculateWeeklyActivity()
-  const scoreTrend = calculateScoreTrend()
-  const studyTime = calculateStudyTime()
-
-  const avgScore = recentSessions && recentSessions.length > 0
-    ? Math.round(
-        recentSessions.reduce((sum: number, s: any) => sum + (s.overall_score || 0), 0) /
-        recentSessions.length
-      )
+  const { level, xpInCurrentLevel, xpToNextLevel } = getLevelAndXP()
+  const badges = getBadges()
+  const avgScore = allSessions?.length > 0 
+    ? Math.round(allSessions.reduce((sum: number, s: any) => sum + (s.overall_score || 0), 0) / allSessions.length)
     : 0
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-tr from-[#edf2f7] to-[#f7f9fb] flex">
-      <aside className="hidden md:flex flex-col justify-between h-screen w-[82px] lg:w-64 sticky top-0 left-0 bg-white/40 dark:bg-slate-900/50 backdrop-blur-xl border-r border-slate-200 z-20 transition-all shadow-lg pb-4">
+      {/* Sidebar */}
+      <aside className="hidden md:flex flex-col justify-between h-screen w-[82px] lg:w-64 sticky top-0 left-0 bg-white/40 backdrop-blur-xl border-r border-slate-200 shadow-lg pb-4">
         <div>
           <div className="px-0 py-7 flex flex-col items-center lg:flex-row lg:items-center lg:space-x-3">
             <div className="w-11 h-11 flex items-center justify-center rounded-xl shadow-lg">
-              <img src="/Icon.png" alt="Locuta.ai" className="w-full h-full object-contain" />
+              <img src="/Icon.png" alt="Locuta" className="w-full h-full object-contain" />
             </div>
-            <span className="ml-0 lg:ml-2 mt-2 lg:mt-0 text-xl font-bold text-slate-900 hidden lg:inline-block select-none">Locuta.ai</span>
+            <span className="ml-0 lg:ml-2 mt-2 lg:mt-0 text-xl font-bold text-slate-900 hidden lg:inline-block">Locuta.ai</span>
           </div>
           <nav className="mt-2">
             <ul className="flex flex-col gap-1">
               {sidebarLinks.map(link => (
                 <li key={link.name}>
-                  <Link
-                    href={link.href}
-                    prefetch={false}
-                    className="flex lg:px-6 px-0 py-2 mb-0 items-center group hover:bg-white/30 hover:backdrop-blur-md relative rounded-lg transition-all duration-200"
-                  >
+                  <Link href={link.href} className="flex lg:px-6 px-0 py-2 mb-0 items-center group hover:bg-white/30 rounded-lg transition-all">
                     <span className="w-12 h-12 flex items-center justify-center">
-                      <span className="text-slate-700 group-hover:text-indigo-600 transition-all">{link.icon}</span>
+                      <span className="text-slate-700 group-hover:text-indigo-600">{link.icon}</span>
                     </span>
-                    <span className="hidden lg:inline-block text-base text-slate-700 group-hover:text-indigo-700 font-semibold truncate">{link.name}</span>
+                    <span className="hidden lg:inline-block text-base text-slate-700 group-hover:text-indigo-700 font-semibold">{link.name}</span>
                   </Link>
                 </li>
               ))}
@@ -486,22 +253,16 @@ console.log('📊 Dashboard Progress Debug:', {
         </div>
         <div className="mb-2 flex flex-col items-center gap-2">
           {isUserAdmin && (
-            <Link 
-              href="/admin"
-              className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg font-semibold shadow-md hover:shadow-xl hover:scale-[1.03] transition-all"
-            >
+            <Link href="/admin" className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg font-semibold shadow-md hover:shadow-xl hover:scale-[1.03] transition-all">
               <span className="text-lg">🔑</span>
               <span className="hidden lg:inline">Admin</span>
             </Link>
           )}
           <form action="/auth/signout" method="post" className="w-full flex justify-center">
-            <button 
-              type="submit"
-              className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-4 py-2 rounded-lg font-semibold shadow-md hover:shadow-xl hover:scale-[1.03] transition-all"
-            >
-              <svg width="20" height="20" fill="none" className="inline mr-1" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+            <button type="submit" className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-4 py-2 rounded-lg font-semibold shadow-md hover:shadow-xl hover:scale-[1.03] transition-all">
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
                 <path d="M13 16l4-4m0 0l-4-4m4 4H7" strokeLinecap="round" strokeLinejoin="round" />
-                <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" strokeWidth="1.5" />
+                <rect x="3" y="3" width="18" height="18" rx="4" strokeWidth="1.5" />
               </svg>
               <span className="hidden lg:inline">Sign Out</span>
             </button>
@@ -510,188 +271,133 @@ console.log('📊 Dashboard Progress Debug:', {
       </aside>
 
       <div className="flex-1 min-h-screen flex flex-col">
-        <header className="md:hidden flex items-center justify-between bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border-b border-slate-200/70 px-4 py-4 shadow-lg z-10 sticky top-0">
+        {/* Mobile Header */}
+        <header className="md:hidden flex items-center justify-between bg-white/70 backdrop-blur-xl border-b border-slate-200 px-4 py-4 shadow-lg sticky top-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md">
-              <img src="/Icon.png" alt="Locuta.ai" className="w-full h-full object-contain" />
-            </div>
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              Locuta.ai
-              {isUserAdmin && (
-                <span className="px-2 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold rounded-full animate-pulse">
-                  ADMIN
-                </span>
-              )}
-            </h1>
+            <img src="/Icon.png" alt="Locuta" className="w-10 h-10 rounded-xl shadow-md" />
+            <h1 className="text-xl font-bold text-slate-900">Locuta.ai</h1>
           </div>
-          <div className="flex items-center gap-2">
-            {isUserAdmin && (
-              <Link 
-                href="/admin"
-                className="text-purple-600 hover:text-purple-700 font-semibold text-sm"
-              >
-                Admin
-              </Link>
-            )}
-            <Link
-              href="/history"
-              className="flex items-center gap-1 text-slate-700 hover:text-purple-600 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-white/50"
-            >
-              <svg width={20} height={20} fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5"><circle cx="12" cy="12" r="9" strokeWidth="1.7" /><path d="M12 8v5l3 3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7"/></svg>
-              <span className="hidden sm:inline">History</span>
-            </Link>
-          </div>
+          <Link href="/history" className="flex items-center gap-1 text-slate-700 hover:text-purple-600 font-medium px-3 py-2 rounded-lg hover:bg-white/50">
+            <svg width={20} height={20} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <circle cx="12" cy="12" r="9" strokeWidth="1.7" />
+              <path d="M12 8v5l3 3" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7"/>
+            </svg>
+            <span className="hidden sm:inline">History</span>
+          </Link>
         </header>
         
-        <main className="w-full flex-1 md:px-0 px-1 py-8 bg-transparent flex flex-col items-center">
-          <div className="w-full max-w-7xl mx-auto rounded-3xl bg-white/70 dark:bg-slate-900/60 backdrop-blur-2xl shadow-2xl px-4 sm:px-8 py-10 mt-2 mb-8 border border-slate-100">
-            <div className="mb-8">
-            <div className="flex items-start justify-between gap-4">
-    {/* Left side: Welcome text */}
-    <div>
-      <h2 className="text-4xl md:text-3xl font-bold text-slate-900/90 mb-2 flex items-center gap-2 flex-wrap">
-        Welcome back! <span className="">👋</span>
-        {isUserAdmin && (
-          <span className="px-3 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold rounded-full animate-pulse">
-            ADMIN
-          </span>
-        )}
-      </h2>
-      <p className="text-slate-600 text-lg">Ready to improve your speaking skills today?</p>
-    </div>
-    
-    {/* Right side: Trial badge - positioned top right */}
-    {user && (
-      <TrialStatusBadge userId={user.id} />
-    )}
-  </div>
-</div>
+        <main className="w-full flex-1 px-1 md:px-0 py-8 flex flex-col items-center">
+          <div className="w-full max-w-7xl mx-auto rounded-3xl bg-white/70 backdrop-blur-2xl shadow-2xl px-4 sm:px-8 py-10 border border-slate-100">
+            
+            {/* Welcome Section with Level */}
+            <div className="mb-8 flex items-start justify-between">
+              <div>
+                <h2 className="text-4xl md:text-3xl font-bold text-slate-900 mb-2 flex items-center gap-3">
+                  Welcome back! 👋
+                  <span className="px-4 py-1.5 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-lg font-bold rounded-full shadow-lg animate-pulse">
+                    Level {level}
+                  </span>
+                </h2>
+                <p className="text-slate-600 text-lg">Keep up the amazing work! 🚀</p>
+              </div>
+            </div>
 
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
-              <div className="p-4 md:p-5 rounded-xl md:rounded-2xl glass-card bg-white/70 backdrop-blur-lg border border-white/40 shadow-xl flex items-center gap-4 hover:scale-[1.01] transition-transform duration-200">
-                <AnimatedRadialProgress percentage={overallPercentage} size={88} color="#8b5cf6" />
+            {/* XP Progress Bar */}
+            <div className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-purple-100 via-pink-100 to-yellow-100 border-2 border-purple-200">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">⚡</span>
+                  <span className="font-bold text-slate-900">{xpInCurrentLevel} / 100 XP</span>
+                </div>
+                <span className="text-sm font-semibold text-purple-700">{xpToNextLevel} XP to Level {level + 1}</span>
+              </div>
+              <div className="w-full h-4 bg-white/60 rounded-full overflow-hidden shadow-inner">
+                <div 
+                  className="h-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 rounded-full transition-all duration-1000 shadow-lg"
+                  style={{ width: `${xpInCurrentLevel}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Stats Cards - Gamified */}
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <div className="p-5 rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-200 shadow-xl flex items-center gap-4 hover:scale-[1.02] transition-transform">
+                <AnimatedRadialProgress percentage={overallPercentage} size={88} />
                 <div>
                   <div className="text-lg font-bold text-slate-800">Your Progress</div>
-                  <div className="text-slate-500">{totalCompleted} / {totalAvailable} lessons complete</div>
+                  <div className="text-purple-700 font-semibold">{totalCompleted} / {totalAvailable} lessons</div>
                 </div>
               </div>
-              <div className="p-4 md:p-5 rounded-xl md:rounded-2xl glass-card bg-white/70 backdrop-blur-lg border border-white/40 shadow-xl flex items-center gap-4 hover:scale-[1.01] transition-transform duration-200">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-pink-100 to-pink-200 flex items-center justify-center">
-                  <span className="text-2xl">⭐</span>
+              
+              <div className="p-5 rounded-xl bg-gradient-to-br from-orange-50 to-red-100 border-2 border-orange-200 shadow-xl flex items-center gap-4 hover:scale-[1.02] transition-transform">
+                <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center shadow-lg">
+                  <span className="text-4xl">🔥</span>
                 </div>
                 <div>
-                  <div className="text-lg font-bold text-slate-800">Recent Avg Score</div>
-                  <div className="text-slate-500">{recentSessions && recentSessions.length > 0 ? avgScore : '-'}</div>
+                  <div className="text-lg font-bold text-slate-800">Streak</div>
+                  <div className="text-orange-700 font-bold text-xl">{currentStreak} day{currentStreak !== 1 ? 's' : ''}</div>
                 </div>
               </div>
-              <div className="p-4 md:p-5 rounded-xl md:rounded-2xl glass-card bg-white/70 backdrop-blur-lg border border-white/40 shadow-xl flex items-center gap-4 hover:scale-[1.01] transition-transform duration-200">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-sky-100 to-emerald-100 flex items-center justify-center">
-                  <span className="text-2xl">📚</span>
+
+              <div className="p-5 rounded-xl bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-200 shadow-xl flex items-center gap-4 hover:scale-[1.02] transition-transform">
+                <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg">
+                  <span className="text-4xl">⭐</span>
                 </div>
                 <div>
-                  <div className="text-lg font-bold text-slate-800">Categories Started</div>
-                  <div className="text-slate-500">{categoryStats.filter((c: any) => c.hasStarted).length} / {categoryStats.length}</div>
+                  <div className="text-lg font-bold text-slate-800">Avg Score</div>
+                  <div className="text-yellow-700 font-bold text-xl">{avgScore || '-'}</div>
                 </div>
               </div>
-              <div className="p-4 md:p-5 rounded-xl md:rounded-2xl glass-card bg-white/70 backdrop-blur-lg border border-white/40 shadow-xl flex items-center gap-4 hover:scale-[1.01] transition-transform duration-200">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-yellow-100 to-amber-100 flex items-center justify-center">
-                  <span className="text-2xl">🏆</span>
+
+              <div className="p-5 rounded-xl bg-gradient-to-br from-green-50 to-emerald-100 border-2 border-green-200 shadow-xl flex items-center gap-4 hover:scale-[1.02] transition-transform">
+                <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
+                  <span className="text-4xl">🏆</span>
                 </div>
                 <div>
                   <div className="text-lg font-bold text-slate-800">Best Score</div>
-                  <div className="text-slate-500">
-                    {progress && progress.length > 0 
-                      ? Math.max(...progress.map((p: any) => p.best_score || 0))
-                      : '-'
-                    }
+                  <div className="text-green-700 font-bold text-xl">
+                    {progress?.length > 0 ? Math.max(...progress.map((p: any) => p.best_score || 0)) : '-'}
                   </div>
                 </div>
               </div>
             </section>
 
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10">
-              <div className="p-4 md:p-5 rounded-xl md:rounded-2xl glass-card bg-white/70 backdrop-blur-lg border border-white/40 shadow-xl flex items-center gap-4 hover:scale-[1.01] transition-transform duration-200">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center">
-                  <span className="text-2xl">🔥</span>
+            {/* Badges Section */}
+            {badges.length > 0 && (
+              <section className="mb-10">
+                <h3 className="text-2xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <span>🎖️</span> Your Badges
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {badges.map((badge, i) => (
+                    <div key={i} className={`${badge.color} px-4 py-2 rounded-xl font-bold shadow-md border-2 border-current flex items-center gap-2 hover:scale-105 transition-transform`}>
+                      <span className="text-2xl">{badge.icon}</span>
+                      <span>{badge.name}</span>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <div className="text-lg font-bold text-slate-800">Current Streak</div>
-                  <div className="text-slate-500">{currentStreak} day{currentStreak !== 1 ? 's' : ''}</div>
-                </div>
-              </div>
-              <div className="p-4 md:p-5 rounded-xl md:rounded-2xl glass-card bg-white/70 backdrop-blur-lg border border-white/40 shadow-xl hover:scale-[1.01] transition-transform duration-200">
-                <div className="flex items-center gap-4 mb-3">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-100 to-indigo-100 flex items-center justify-center">
-                    <span className="text-2xl">📊</span>
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold text-slate-800">This Week's Activity</div>
-                    <div className="text-slate-500">{weeklyActivity.completed} / {weeklyActivity.goal} lessons</div>
-                  </div>
-                </div>
-                <div className="w-full h-2 bg-slate-200/70 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-600 transition-all duration-700 rounded-full"
-                    style={{ width: `${weeklyActivity.percentage}%` }}
-                  />
-                </div>
-              </div>
-              <div className="p-4 md:p-5 rounded-xl md:rounded-2xl glass-card bg-white/70 backdrop-blur-lg border border-white/40 shadow-xl flex items-center gap-4 hover:scale-[1.01] transition-transform duration-200">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center">
-                  {scoreTrend.trend === 1 ? (
-                    <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                    </svg>
-                  ) : scoreTrend.trend === -1 ? (
-        
-                    <svg className="w-7 h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
-                  ) : (
-                    <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14" />
-                    </svg>
-                  )}
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-slate-800">Score Trend</div>
-                  <div className="text-slate-500">
-                    {scoreTrend.trend === 1 ? 'Improving' : scoreTrend.trend === -1 ? 'Declining' : 'Stable'}
-                  </div>
-                </div>
-              </div>
-              <div className="p-4 md:p-5 rounded-xl md:rounded-2xl glass-card bg-white/70 backdrop-blur-lg border border-white/40 shadow-xl flex items-center gap-4 hover:scale-[1.01] transition-transform duration-200">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-100 to-cyan-100 flex items-center justify-center">
-                  <span className="text-2xl">⏱️</span>
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-slate-800">Study Time</div>
-                  <div className="text-slate-500">{studyTime.weekly} min this week</div>
-                  <div className="text-xs text-slate-400">{studyTime.monthly} min this month</div>
-                </div>
-              </div>
-            </section>
+              </section>
+            )}
+
+            {/* Categories Section - More Colorful */}
             <section>
-              <h3 className="text-2xl font-bold text-slate-900 mb-6">
-                Choose Your Practice Category
+              <h3 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <span>🎯</span> Choose Your Practice Category
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {categoryStats.map((category: any) => (
-                  <Link
-                    key={category.id}
-                    href={`/category/${category.id}/tone`}
-                    className="group focus:outline-none"
-                  >
-                    <div className="relative bg-white/80 backdrop-blur-xl border-2 border-purple-200/40 hover:border-indigo-300/60 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group-hover:scale-[1.02] category-card">
-                      <div className="absolute inset-0 bg-gradient-to-br from-purple-50/30 via-transparent to-indigo-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <Link key={category.id} href={`/category/${category.id}`} className="group">
+                    <div className="relative bg-white rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden group-hover:scale-[1.03] border-2 border-transparent hover:border-purple-300">
+                      {/* Gradient Background */}
+                      <div className={`absolute inset-0 bg-gradient-to-br ${category.color} opacity-10 group-hover:opacity-20 transition-opacity`} />
                       
                       <div className="relative p-6">
                         <div className="flex items-start justify-between mb-4">
-                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-100/80 to-indigo-100/80 backdrop-blur-sm flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300 icon-container">
-                            <span className="text-3xl category-icon">{category.icon}</span>
+                          <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${category.color} flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all group-hover:rotate-6`}>
+                            <span className="text-3xl">{category.icon}</span>
                           </div>
                           {category.completionPercentage > 0 && (
-                            <div className="px-3 py-1.5 rounded-full bg-white/90 backdrop-blur-sm border border-purple-200/50 text-sm font-bold text-purple-700 shadow-sm">
+                            <div className={`px-3 py-1.5 rounded-full bg-gradient-to-r ${category.color} text-white text-sm font-bold shadow-md`}>
                               {category.completionPercentage}%
                             </div>
                           )}
@@ -700,16 +406,12 @@ console.log('📊 Dashboard Progress Debug:', {
                         <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-purple-700 transition-colors">
                           {category.name}
                         </h3>
-                        <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-                          {category.description}
-                        </p>
+                        <p className="text-slate-600 text-sm mb-4 leading-relaxed">{category.description}</p>
 
                         <div className="flex items-center gap-4 mb-4">
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-purple-100/60 flex items-center justify-center">
-                              <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                              </svg>
+                            <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                              <span className="text-lg">📚</span>
                             </div>
                             <div>
                               <div className="text-xs text-slate-500">Lessons</div>
@@ -719,10 +421,8 @@ console.log('📊 Dashboard Progress Debug:', {
                           
                           {category.bestScore > 0 && (
                             <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-indigo-100/60 flex items-center justify-center">
-                                <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                                </svg>
+                              <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center">
+                                <span className="text-lg">✨</span>
                               </div>
                               <div>
                                 <div className="text-xs text-slate-500">Best</div>
@@ -733,17 +433,15 @@ console.log('📊 Dashboard Progress Debug:', {
                         </div>
 
                         <div className="mb-4">
-                          <div className="w-full h-2 bg-slate-200/70 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full transition-all duration-700"
-                              style={{ width: `${category.completionPercentage}%` }}
-                            />
+                          <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                            <div className={`h-full bg-gradient-to-r ${category.color} rounded-full transition-all duration-700 shadow-lg`}
+                                 style={{ width: `${category.completionPercentage}%` }} />
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between text-sm font-semibold">
-                          <span className="text-purple-700 group-hover:text-indigo-700 transition-colors">
-                            {category.hasStarted ? 'Continue Learning' : 'Start Learning'}
+                        <div className="flex items-center justify-between text-sm font-bold">
+                          <span className={`bg-gradient-to-r ${category.color} bg-clip-text text-transparent`}>
+                            {category.hasStarted ? '🎮 Continue' : '🚀 Start Now'}
                           </span>
                           <svg className="w-5 h-5 text-purple-600 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -756,47 +454,36 @@ console.log('📊 Dashboard Progress Debug:', {
               </div>
             </section>
 
+            {/* First Time User Message - More Exciting */}
             {totalCompleted === 0 && (
-              <div className="mt-12 text-center bg-white/70 backdrop-blur-xl border-2 border-purple-200/40 rounded-2xl p-12 glass-card shadow-lg">
-                <div className="inline-block mb-4 sparkle-icon">
-                  <svg className="w-16 h-16 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                  </svg>
+              <div className="mt-12 text-center bg-gradient-to-r from-purple-100 via-pink-100 to-yellow-100 border-4 border-purple-300 rounded-3xl p-12 shadow-2xl">
+                <div className="inline-block mb-4 animate-bounce">
+                  <span className="text-6xl">🎉</span>
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-3">
-                  Ready to Start Your Journey?
-                </h3>
-                <p className="text-slate-600 text-lg max-w-2xl mx-auto leading-relaxed">
-                  Choose any category above to begin practicing. Each lesson takes just 1-2 minutes, 
-                  and you'll get instant AI feedback to help you improve!
+                <h3 className="text-3xl font-bold text-slate-900 mb-3">Ready to Start Your Adventure?</h3>
+                <p className="text-slate-700 text-xl max-w-2xl mx-auto leading-relaxed mb-6">
+                  Choose any category above to begin! Earn XP, unlock badges, and level up as you practice! 🚀
                 </p>
+                <div className="flex justify-center gap-4 text-sm font-semibold text-slate-600">
+                  <span>🌟 Earn 10 XP per lesson</span>
+                  <span>🏆 Unlock cool badges</span>
+                  <span>🔥 Build your streak</span>
+                </div>
               </div>
             )}
           </div>
         </main>
         
-        <footer className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border-t border-slate-200/70 py-6 mt-8">
+        {/* Footer */}
+        <footer className="bg-white/70 backdrop-blur-xl border-t border-slate-200 py-6 mt-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-bold text-slate-900">
-                  Locuta.ai
-                </span>
-              </div>
-              <p className="text-slate-600 text-sm">
-                © 2025 Locuta.ai. Elevate your voice.
-              </p>
+              <span className="text-lg font-bold text-slate-900">Locuta.ai</span>
+              <p className="text-slate-600 text-sm">© 2025 Locuta.ai. Elevate your voice.</p>
             </div>
           </div>
         </footer>
       </div>
-
-      {/* Welcome Modal */}
-      {showWelcomeModal && (
-        <TrialWelcomeModal onClose={() => setShowWelcomeModal(false)} />
-      )}
-      {/* Founder Call Button */}
-      <FounderCallButton />
     </div>
   )
 }
