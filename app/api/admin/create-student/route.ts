@@ -46,29 +46,52 @@ export async function POST(request: NextRequest) {
     })
 
     if (createError) {
+      console.error('User creation error:', createError)
       return NextResponse.json({ error: createError.message }, { status: 400 })
     }
 
-    // Update profile using service role client to bypass RLS
-    if (newUser.user) {
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .update({
-          full_name: full_name,
-          account_type: 'student',
-          student_id: finalStudentId,
-          grade: parseInt(grade),
-          class_section: class_section || null,
-          roll_number: roll_number || null,
-          created_by_admin_id: user.id
-        })
-        .eq('id', newUser.user.id)
-
-      if (profileError) {
-        console.error('Profile update error:', profileError)
-        return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
-      }
+    if (!newUser.user) {
+      console.error('User creation returned no user object')
+      return NextResponse.json({ error: 'User creation failed' }, { status: 500 })
     }
+
+    console.log('✅ User created successfully:', newUser.user.id)
+
+    // Upsert profile using service role client to bypass RLS
+    // This will insert if profile doesn't exist, or update if it does
+    const profileData = {
+      id: newUser.user.id,
+      full_name: full_name,
+      account_type: 'student',
+      student_id: finalStudentId,
+      grade: parseInt(grade),
+      class_section: class_section || null,
+      roll_number: roll_number || null,
+      created_by_admin_id: user.id
+    }
+
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .upsert(profileData, {
+        onConflict: 'id'
+      })
+
+    if (profileError) {
+      console.error('Profile upsert error:', {
+        error: profileError,
+        code: profileError.code,
+        message: profileError.message,
+        details: profileError.details,
+        hint: profileError.hint,
+        profileData
+      })
+      return NextResponse.json({ 
+        error: 'Failed to create/update profile', 
+        details: profileError.message 
+      }, { status: 500 })
+    }
+
+    console.log('✅ Profile upserted successfully for user:', newUser.user.id)
 
     return NextResponse.json({
       success: true,
