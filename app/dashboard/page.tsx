@@ -301,6 +301,21 @@ export default function DashboardPage() {
                 <p className="text-slate-600 text-lg">Keep up the amazing work! 🚀</p>
               </div>
             </div>
+            {/* School Admin: Create Student Button */}
+<div className="mb-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white">
+  <div className="flex items-center justify-between">
+    <div>
+      <h3 className="text-2xl font-bold mb-2">👨‍🎓 Manage Students</h3>
+      <p className="text-white/90">Create and manage student accounts for your institution</p>
+    </div>
+    <Link 
+      href="/admin/create-student"
+      className="bg-white text-indigo-600 px-6 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-all shadow-lg hover:scale-105"
+    >
+      + Create Student
+    </Link>
+  </div>
+</div>
 
             {/* XP Progress Bar */}
             <div className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-purple-100 via-pink-100 to-yellow-100 border-2 border-purple-200">
