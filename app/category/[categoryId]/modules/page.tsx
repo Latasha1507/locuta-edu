@@ -1,437 +1,246 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { isAdmin } from '@/lib/admin'
+import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import AchievementBadge from '@/components/AchievementBadge'
 
-const categoryMap: { [key: string]: string } = {
-  'public-speaking': 'Public Speaking',
+const CATEGORY_MAP: { [key: string]: string } = {
+  // Middle School (Grades 5-8)
+  'public-speaking-fundamentals': 'Public Speaking Fundamentals',
   'storytelling': 'Storytelling',
-  'creator-speaking': 'Creator Speaking',
-  'casual-conversation': 'Casual Conversation',
-  'workplace-communication': 'Workplace Communication',
-  'pitch-anything': 'Pitch Anything',
+  'leadership-team-communication': 'Leadership & Team Communication',
+  'conversation-skills': 'Conversation Skills',
+  'project-academic-presentation': 'Project & Academic Presentation Skills',
+  'persuasive-speaking': 'Persuasive Speaking',
+  
+  // High School (Grades 9-12)
+  'public-speaking-mastery': 'Public Speaking Mastery',
+  'advanced-storytelling': 'Advanced Storytelling & Content',
+  'leadership-team-advanced': 'Leadership & Team Communication (Advanced)',
+  'content-creation-digital': 'Content Creation & Digital Communication',
+  'entrepreneurial-sales': 'Entrepreneurial & Sales Communication',
+  'debate-advanced-persuasion': 'Debate & Advanced Persuasion'
 }
 
-const categoryColors: { [key: string]: string } = {
-  'public-speaking': 'from-purple-500 to-indigo-600',
-  'storytelling': 'from-blue-500 to-cyan-600',
-  'creator-speaking': 'from-pink-500 to-rose-600',
-  'casual-conversation': 'from-green-500 to-emerald-600',
-  'workplace-communication': 'from-indigo-500 to-purple-600',
-  'pitch-anything': 'from-teal-500 to-cyan-600',
+const CATEGORY_COLORS: { [key: string]: string } = {
+  'public-speaking-fundamentals': 'from-purple-400 to-pink-500',
+  'storytelling': 'from-blue-400 to-cyan-500',
+  'leadership-team-communication': 'from-green-400 to-emerald-500',
+  'conversation-skills': 'from-yellow-400 to-orange-500',
+  'project-academic-presentation': 'from-red-400 to-pink-500',
+  'persuasive-speaking': 'from-indigo-400 to-purple-500',
+  'public-speaking-mastery': 'from-purple-400 to-indigo-600',
+  'advanced-storytelling': 'from-blue-400 to-purple-500',
+  'leadership-team-advanced': 'from-green-400 to-teal-500',
+  'content-creation-digital': 'from-pink-400 to-rose-500',
+  'entrepreneurial-sales': 'from-orange-400 to-red-500',
+  'debate-advanced-persuasion': 'from-cyan-400 to-blue-500'
 }
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
-export default async function CategoryModulesPage({
+export default async function CategoryPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ categoryId: string }>
-  searchParams: Promise<{ tone?: string; module?: string }>
 }) {
-  const resolvedParams = await params
-  const resolvedSearchParams = await searchParams
-  const { categoryId } = resolvedParams
-  const tone = resolvedSearchParams.tone || 'Normal'
-  const currentModuleParam = resolvedSearchParams.module || '1'
-  const currentModuleNumber = parseInt(currentModuleParam)
-
+  const { categoryId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect('/auth/login')
-  }
-  
-  const categoryName = categoryMap[categoryId]
-  const isUserAdmin = await isAdmin()
-  if (!categoryName) {
-    notFound()
-  }
+  if (!user) redirect('/auth/login')
 
+  const categoryName = CATEGORY_MAP[categoryId]
+  if (!categoryName) notFound()
+
+  // Get user's grade from profile
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('grade, full_name')
+    .eq('id', user.id)
+    .single()
+
+  const userGrade = profile?.grade || 5 // Default to grade 5 if not set
+
+  // Get all lessons for this category
   const { data: lessons } = await supabase
     .from('lessons')
     .select('*')
     .eq('category', categoryName)
-    .order('module_number')
-    .order('level_number')
+    .order('module_number', { ascending: true })
+    .order('level_number', { ascending: true })
 
-  const modules: { [key: number]: any[] } = {}
-  lessons?.forEach((lesson) => {
-    if (!modules[lesson.module_number]) {
-      modules[lesson.module_number] = []
-    }
-    modules[lesson.module_number].push(lesson)
-  })
-
+  // Get user progress
   const { data: progress } = await supabase
     .from('user_progress')
     .select('*')
     .eq('user_id', user.id)
     .eq('category', categoryName)
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  const progressMap: { [key: string]: any } = {}
-  progress?.forEach((p) => {
-    progressMap[`${p.module_number}-${p.level_number}`] = p
+  // Group lessons by module
+  const modules: { [key: number]: any[] } = {}
+  lessons?.forEach(lesson => {
+    if (!modules[lesson.module_number]) {
+      modules[lesson.module_number] = []
+    }
+    modules[lesson.module_number].push(lesson)
   })
 
-  // 🔍 ADD THIS DEBUG
-console.log('📚 Module Page Progress Debug:', {
-  categoryName,
-  totalProgressRecords: progress?.length || 0,
-  progressMap,
-  completedCount: progress?.filter(p => p.completed).length || 0,
-  allProgress: progress
-})
   const totalLessons = lessons?.length || 0
   const completedLessons = progress?.filter(p => p.completed).length || 0
   const overallProgress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
-  // 🔍 MORE DEBUG
-console.log('📊 Calculated Progress:', {
-  totalLessons,
-  completedLessons,
-  overallProgress
-})
-  const gradientColor = categoryColors[categoryId] || 'from-purple-500 to-indigo-600'
-
-  const normalizeString = (value?: string | null) =>
-    typeof value === 'string' ? value.toLowerCase() : ''
-
-  const normalizedPlanType = normalizeString(
-    (profile as any)?.plan_type || (profile as any)?.plan || (profile as any)?.tier
-  )
-  const normalizedSubscriptionStatus = normalizeString(
-    (profile as any)?.subscription_status ||
-      (profile as any)?.plan_status ||
-      (profile as any)?.membership_status
-  )
-  const trialEndsAt =
-    (profile as any)?.trial_ends_at ||
-    (profile as any)?.trial_end ||
-    (profile as any)?.trialEndsAt ||
-    (profile as any)?.trialEnds ||
-    null
-  const isTrialActive = trialEndsAt ? new Date(trialEndsAt).getTime() > Date.now() : false
-  const hasLifetimeAccess = Boolean(
-    (profile as any)?.lifetime_access ||
-      (profile as any)?.founder_access ||
-      (profile as any)?.beta_access ||
-      (profile as any)?.pro_access
-  )
-  const hasActiveSubscriptionFlag = Boolean(
-    (profile as any)?.has_active_subscription ||
-      (profile as any)?.active_subscription ||
-      (profile as any)?.is_subscription_active
-  )
-
-  const hasFullAccess =
-    isUserAdmin ||
-    hasLifetimeAccess ||
-    hasActiveSubscriptionFlag ||
-    isTrialActive ||
-    ['pro', 'paid', 'premium', 'founder', 'lifetime'].includes(normalizedPlanType) ||
-    ['active', 'trialing'].includes(normalizedSubscriptionStatus)
-
-  const isModuleUnlocked = (moduleNum: number): boolean => {
-    if (isUserAdmin) return true
-    if (moduleNum === 1) return true
-
-    if (!hasFullAccess) return false
-
-    const previousModule = modules[moduleNum - 1]
-    if (!previousModule) return true
-
-    const allPreviousCompleted = previousModule.every(
-      (lesson) => progressMap[`${moduleNum - 1}-${lesson.level_number}`]?.completed
-    )
-
-    return allPreviousCompleted
-  }
-
-  const moduleNumbers = Object.keys(modules).map(Number).sort((a, b) => a - b)
-  const currentModule = moduleNumbers.includes(currentModuleNumber) 
-    ? currentModuleNumber 
-    : moduleNumbers[0]
   
-  const currentModuleIndex = moduleNumbers.indexOf(currentModule)
-  const hasNextModule = currentModuleIndex < moduleNumbers.length - 1
-  const hasPrevModule = currentModuleIndex > 0
+  const gradientColor = CATEGORY_COLORS[categoryId] || 'from-purple-500 to-indigo-600'
+  const segment = userGrade <= 8 ? 'Middle School' : 'High School'
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-            <Link
-              href={`/category/${categoryId}/tone`}
-              className="text-gray-600 hover:text-gray-900 transition-colors flex-shrink-0"
-            >
-              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="min-h-screen bg-gradient-to-tr from-[#edf2f7] to-[#f7f9fb]">
+      {/* Header */}
+      <header className="bg-white/70 backdrop-blur-xl border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <Link href="/dashboard" className="text-slate-700 hover:text-indigo-600 font-medium flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
+              Back to Dashboard
             </Link>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">{categoryName}</h1>
-              <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                {moduleNumbers.length} modules • {totalLessons} lessons • {tone} Tone
-              </p>
-            </div>
-            <div className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl shadow-lg w-full sm:w-auto">
-              <div className="text-xs sm:text-sm font-medium opacity-90">Overall Progress</div>
-              <div className="text-2xl sm:text-3xl font-bold">{overallProgress}%</div>
-              <div className="text-xs opacity-75">{completedLessons}/{totalLessons} lessons</div>
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-slate-600">
+                Grade {userGrade} • {segment}
+              </div>
+              <img src="/Icon.png" alt="Locuta" className="w-8 h-8" />
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
-        {isUserAdmin && (
-          <div className="mb-4 sm:mb-6 bg-purple-50 border-2 border-purple-200 rounded-xl p-3 sm:p-4 shadow-lg">
-            <p className="text-purple-900 font-semibold flex flex-wrap items-center gap-2 text-sm sm:text-base">
-              🔑 <span>Admin Mode:</span> <span className="text-purple-600">All lessons unlocked for testing</span>
-            </p>
-          </div>
-        )}
-
-        {!hasFullAccess && (
-          <div className="rounded-xl border border-orange-200/70 bg-white shadow-sm px-4 sm:px-5 py-3">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-2xl flex-shrink-0">🔒</div>
-                <div>
-                  <p className="text-sm sm:text-base font-semibold text-orange-900">
-                    Keep your streak going, unlock every module with Pro!
-                  </p>
-                  <p className="text-xs sm:text-sm text-orange-700">
-                    The free plan covers Module 1; Modules 2+ open up as soon as you upgrade.
-                  </p>
-                </div>
-              </div>
-              <Link
-                href="/pricing"
-                className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-2 text-sm font-semibold text-white shadow hover:from-orange-600 hover:to-amber-600 transition self-end sm:self-auto"
-              >
-                Upgrade to Pro
-              </Link>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Category Header */}
+        <div className={`bg-gradient-to-r ${gradientColor} rounded-3xl shadow-2xl p-8 mb-8 text-white`}>
+          <h1 className="text-4xl font-bold mb-4">{categoryName}</h1>
+          <div className="flex items-center gap-8">
+            <div>
+              <div className="text-5xl font-bold">{overallProgress}%</div>
+              <div className="text-white/90">Overall Progress</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold">{completedLessons}/{totalLessons}</div>
+              <div className="text-white/90">Lessons Completed</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold">{Object.keys(modules).length}</div>
+              <div className="text-white/90">Modules</div>
             </div>
           </div>
-        )}
+          
+          {/* Progress Bar */}
+          <div className="mt-6 bg-white/20 h-3 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-white rounded-full transition-all duration-500"
+              style={{ width: `${overallProgress}%` }}
+            />
+          </div>
+        </div>
 
-        {moduleNumbers.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 lg:p-12 text-center border border-gray-200">
-            <div className="text-4xl sm:text-6xl mb-4">📚</div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">No lessons yet</h2>
-            <p className="text-sm sm:text-base text-gray-600 mb-6">Lessons for this category are coming soon!</p>
-            <Link href="/dashboard" className="inline-block px-4 sm:px-6 py-2 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm sm:text-base font-medium rounded-lg transition shadow-lg">
-              Back to Dashboard
-            </Link>
+        {/* Modules List */}
+        {Object.keys(modules).length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+            <div className="text-6xl mb-4">📚</div>
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">No lessons yet</h2>
+            <p className="text-slate-600">Lessons for this category are coming soon!</p>
           </div>
         ) : (
-          <>
-            {moduleNumbers.map((moduleNumber) => {
-              if (moduleNumber !== currentModule) return null
-
-              const moduleLessons = modules[moduleNumber]
+          <div className="space-y-8">
+            {Object.entries(modules).map(([moduleNum, moduleLessons]) => {
+              const moduleNumber = parseInt(moduleNum)
               const moduleTitle = moduleLessons[0]?.module_title || `Module ${moduleNumber}`
-              const completedCount = moduleLessons.filter(
-                (lesson) => progressMap[`${moduleNumber}-${lesson.level_number}`]?.completed
-              ).length
-              const moduleProgress = Math.round((completedCount / moduleLessons.length) * 100)
-              const isUnlocked = isModuleUnlocked(moduleNumber)
+              
+              const moduleProgress = progress?.filter(
+                p => p.module_number === moduleNumber
+              ) || []
+              
+              const moduleCompleted = moduleProgress.filter(p => p.completed).length
+              const modulePercentage = Math.round((moduleCompleted / moduleLessons.length) * 100)
 
               return (
-                <div key={moduleNumber} className="space-y-4">
-                  <div className="flex items-center justify-between mb-2 sm:mb-3">
-                    <Link
-                      href={hasPrevModule ? `?tone=${tone}&module=${moduleNumbers[currentModuleIndex - 1]}` : '#'}
-                      className={`flex items-center justify-center w-10 h-10 rounded-full transition-all shadow ${
-                        hasPrevModule
-                          ? 'bg-white hover:bg-purple-50 text-purple-600 hover:scale-105 border border-purple-200'
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
-                      }`}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </Link>
-                    <span className="text-sm text-gray-600 font-medium">Module {currentModule} of {moduleNumbers.length}</span>
-                    <Link
-                      href={hasNextModule ? `?tone=${tone}&module=${moduleNumbers[currentModuleIndex + 1]}` : '#'}
-                      className={`flex items-center justify-center w-10 h-10 rounded-full transition-all shadow ${
-                        hasNextModule
-                          ? 'bg-white hover:bg-purple-50 text-purple-600 hover:scale-105 border border-purple-200'
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
-                      }`}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
+                <div key={moduleNumber} className="bg-white rounded-2xl shadow-xl overflow-hidden">
+                  {/* Module Header */}
+                  <div className={`bg-gradient-to-r ${gradientColor} p-6 text-white`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm opacity-90 mb-1">Module {moduleNumber}</div>
+                        <h2 className="text-2xl font-bold">{moduleTitle}</h2>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-4xl font-bold">{modulePercentage}%</div>
+                        <div className="text-sm opacity-90">{moduleCompleted}/{moduleLessons.length} lessons</div>
+                      </div>
+                    </div>
+                    
+                    {/* Module Progress Bar */}
+                    <div className="mt-4 bg-white/20 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-white rounded-full transition-all duration-500"
+                        style={{ width: `${modulePercentage}%` }}
+                      />
+                    </div>
                   </div>
 
-                  <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300">
-                    <div className={`bg-gradient-to-r ${gradientColor} px-5 py-5 text-white relative`}>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs uppercase tracking-wide text-white/80 mb-1">Module {moduleNumber}</p>
-                          <h2 className="text-xl sm:text-2xl font-bold truncate">{moduleTitle}</h2>
-                        </div>
-                        <div className="text-left sm:text-right">
-                          <div className="text-3xl font-bold">{moduleProgress}%</div>
-                          <p className="text-xs text-white/90">Complete</p>
-                        </div>
-                      </div>
-                      <div className="mt-4 bg-white/20 h-2 rounded-full overflow-hidden backdrop-blur-sm">
-                        <div 
-                          className="h-full bg-white rounded-full transition-all duration-500 shadow-lg" 
-                          style={{ width: `${moduleProgress}%` }}
-                        ></div>
-                      </div>
-                      <p className="text-xs text-white/90 mt-2">{completedCount} of {moduleLessons.length} lessons completed</p>
-                    </div>
+                  {/* Lessons Grid */}
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {moduleLessons.map(lesson => {
+                        const lessonProgress = progress?.find(
+                          p => p.module_number === moduleNumber && p.level_number === lesson.level_number
+                        )
+                        const isCompleted = lessonProgress?.completed || false
+                        const bestScore = lessonProgress?.best_score || 0
 
-                    <div className="p-4 sm:p-6">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-                        {moduleLessons.map((lesson) => {
-                            const lessonProgress = progressMap[`${moduleNumber}-${lesson.level_number}`]
-                            const isCompleted = lessonProgress?.completed || false
-                            const bestScore = lessonProgress?.best_score || null
-                            
-                            const isLessonUnlocked = (() => {
-                              if (isUserAdmin) return true
-                              if (moduleNumber === 1) return true
-                              if (moduleNumber > 1) {
-                                if (!hasFullAccess) {
-                                  return false
-                                }
-                                const previousModule = modules[moduleNumber - 1]
-                                if (!previousModule) return true
-                                const allPreviousCompleted = previousModule.every(
-                                  (prevLesson) => progressMap[`${moduleNumber - 1}-${prevLesson.level_number}`]?.completed
-                                )
-                                return allPreviousCompleted
-                              }
-                              return false
-                            })()
-
-                            const LessonCard = (
-                              <div
-                                key={lesson.id}
-                                className={`group relative bg-white border rounded-lg sm:rounded-xl p-3 sm:p-4 transition-all duration-300 ${
-                                  isLessonUnlocked 
-                                    ? 'border-gray-200 hover:border-purple-300 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer' 
-                                    : 'border-gray-200 cursor-not-allowed opacity-60'
-                                }`}
-                              >
-                                {!isLessonUnlocked && (
-                                  <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
-                                    <div className="bg-gray-200 text-gray-600 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                                      <span>🔒</span>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {isCompleted && isLessonUnlocked && bestScore && (
-                                  <div className="absolute top-3 right-3 flex items-center gap-2">
-                                    <AchievementBadge score={bestScore} />
-                                  </div>
-                                )}
-
-                                <div className="flex items-start gap-3">
-                                  <div className={`relative w-11 h-11 sm:w-14 sm:h-14 rounded-lg flex items-center justify-center font-bold text-base sm:text-xl flex-shrink-0 transition-all duration-300 shadow ${
-                                    isCompleted && isLessonUnlocked
-                                      ? 'bg-gradient-to-br from-green-400 to-emerald-500 text-white' 
-                                      : isLessonUnlocked
-                                      ? 'bg-gradient-to-br from-purple-50 to-indigo-100 text-purple-700 group-hover:from-purple-100 group-hover:to-indigo-200'
-                                      : 'bg-gradient-to-br from-gray-100 to-gray-200 text-gray-500'
-                                  }`}>
-                                    {isCompleted && isLessonUnlocked ? (
-                                      <span className="text-xl sm:text-2xl">✓</span>
-                                    ) : (
-                                      lesson.level_number
-                                    )}
-                                    {isCompleted && isLessonUnlocked && bestScore && bestScore >= 80 && (
-                                      <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-6 h-6 sm:w-8 sm:h-8 bg-yellow-400 rounded-full flex items-center justify-center animate-bounce">
-                                        <span className="text-xs sm:text-lg">{bestScore >= 90 ? '⭐' : '🏆'}</span>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="flex-1 min-w-0">
-                                    <h3 className={`font-semibold text-sm sm:text-base mb-1 transition-colors leading-snug ${
-                                      isLessonUnlocked ? 'text-gray-900 group-hover:text-purple-600' : 'text-gray-600'
-                                    }`}>
-                                      {lesson.level_title}
-                                    </h3>
-                                    <p className={`text-xs sm:text-sm line-clamp-2 leading-relaxed mb-3 ${
-                                      isLessonUnlocked ? 'text-gray-600' : 'text-gray-500'
-                                    }`}>
-                                      {lesson.lesson_explanation}
-                                    </p>
-                                    
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold ${
-                                          isCompleted && isLessonUnlocked
-                                            ? 'bg-green-100 text-green-700' 
-                                            : isLessonUnlocked
-                                            ? 'bg-gray-100 text-gray-600'
-                                            : 'bg-gray-100 text-gray-500'
-                                        }`}>
-                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                          </svg>
-                                          <span className="font-bold">{lesson.expected_duration_sec}s</span>
-                                        </div>
-
-                                        {bestScore && isLessonUnlocked && (
-                                          <div className="inline-flex items-center gap-1 bg-gradient-to-r from-purple-50 to-indigo-100 text-purple-700 px-2 py-0.5 rounded-lg text-[11px] font-semibold">
-                                            <span>Best:</span>
-                                            <span className="font-bold">{bestScore}/100</span>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {isLessonUnlocked && (
-                                        <svg className="w-5 h-5 text-gray-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                        </svg>
-                                      )}
-                                    </div>
-                                  </div>
+                        return (
+                          <Link
+                            key={lesson.level_number}
+                            href={`/category/${categoryId}/module/${moduleNumber}/lesson/${lesson.level_number}/practice`}
+                            className="group"
+                          >
+                            <div className={`rounded-xl p-5 border-2 transition-all hover:scale-105 ${
+                              isCompleted 
+                                ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 hover:border-green-400'
+                                : 'bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200 hover:border-purple-400'
+                            }`}>
+                              <div className="flex items-start justify-between mb-3">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg ${
+                                  isCompleted 
+                                    ? 'bg-gradient-to-br from-green-500 to-emerald-600' 
+                                    : 'bg-gradient-to-br from-purple-500 to-indigo-600'
+                                }`}>
+                                  {isCompleted ? '✓' : lesson.level_number}
                                 </div>
+                                {isCompleted && bestScore > 0 && (
+                                  <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">
+                                    {bestScore}
+                                  </div>
+                                )}
                               </div>
-                            )
-
-                            return isLessonUnlocked ? (
-                              <Link
-                                key={lesson.id}
-                                href={`/category/${categoryId}/module/${moduleNumber}/lesson/${lesson.level_number}/practice?tone=${tone}`}
-                              >
-                                {LessonCard}
-                              </Link>
-                            ) : (
-                              LessonCard
-                            )
-                          })}
-                      </div>
+                              
+                              <h3 className="font-bold text-slate-900 mb-2 group-hover:text-purple-700 transition-colors">
+                                {lesson.level_title}
+                              </h3>
+                              
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-slate-500">
+                                  {lesson.expected_duration_sec}s
+                                </span>
+                                <span className={`font-semibold ${isCompleted ? 'text-green-700' : 'text-purple-700'}`}>
+                                  {isCompleted ? 'Practice Again' : 'Start'} →
+                                </span>
+                              </div>
+                            </div>
+                          </Link>
+                        )
+                      })}
                     </div>
                   </div>
                 </div>
               )
             })}
-          </>
+          </div>
         )}
       </main>
     </div>
