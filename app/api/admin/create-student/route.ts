@@ -58,21 +58,14 @@ export async function POST(request: NextRequest) {
     console.log('✅ User created successfully:', newUser.user.id)
 
     // Upsert profile using service role client to bypass RLS
-    // This will insert if profile doesn't exist, or update if it does
-    const profileData = {
-      id: newUser.user.id,
-      full_name: full_name,
-      account_type: 'student',
-      student_id: finalStudentId,
-      grade: parseInt(grade),
-      class_section: class_section || null,
-      roll_number: roll_number || null,
-      created_by_admin_id: user.id
-    }
-
+    // Only store full_name - student-specific data (account_type, student_id, grade, etc.) 
+    // is already stored in user_metadata and can be accessed via user.user_metadata
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .upsert(profileData, {
+      .upsert({
+        id: newUser.user.id,
+        full_name: full_name
+      }, {
         onConflict: 'id'
       })
 
@@ -82,8 +75,7 @@ export async function POST(request: NextRequest) {
         code: profileError.code,
         message: profileError.message,
         details: profileError.details,
-        hint: profileError.hint,
-        profileData
+        hint: profileError.hint
       })
       return NextResponse.json({ 
         error: 'Failed to create/update profile', 
