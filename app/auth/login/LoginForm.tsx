@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 export default function LoginForm() {
   const searchParams = useSearchParams()
@@ -23,8 +24,8 @@ export default function LoginForm() {
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8">
             <img src="/Icon.png" alt="Locuta" className="w-16 h-16 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Welcome to Locuta</h1>
-            <p className="text-slate-600">Sign in to start improving your speaking skills</p>
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">Admin Login</h1>
+            <p className="text-slate-600">Sign in to manage your institution</p>
           </div>
 
           {error && (
@@ -35,7 +36,7 @@ export default function LoginForm() {
 
           <button
             onClick={handleGoogleLogin}
-            className="w-full bg-white border-2 border-slate-300 text-slate-700 px-6 py-3 rounded-xl font-semibold hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-md hover:shadow-lg"
+            className="w-full bg-white border-2 border-slate-300 text-slate-700 px-6 py-3 rounded-xl font-semibold hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-md hover:shadow-lg mb-6"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -46,9 +47,33 @@ export default function LoginForm() {
             Continue with Google
           </button>
 
-          <p className="text-center text-xs text-slate-500 mt-6">
-            By signing in, you agree to our Terms of Service and Privacy Policy
-          </p>
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white text-slate-500">Or</span>
+            </div>
+          </div>
+
+          <Link
+            href="/auth/student-login"
+            className="block w-full text-center px-6 py-3 border-2 border-indigo-200 bg-indigo-50 text-indigo-700 rounded-xl font-semibold hover:bg-indigo-100 transition-all mb-6"
+          >
+            Student Login
+          </Link>
+
+          <div className="text-center space-y-2">
+            <p className="text-sm text-slate-600">
+              Don't have an account?{' '}
+              <Link href="/auth/signup" className="text-indigo-600 hover:text-indigo-700 font-semibold">
+                Sign up
+              </Link>
+            </p>
+            <p className="text-xs text-slate-500">
+              By signing in, you agree to our Terms of Service and Privacy Policy
+            </p>
+          </div>
         </div>
       </div>
     </div>

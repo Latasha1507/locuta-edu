@@ -140,8 +140,8 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-lg">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Create your account</h2>
-          <p className="mt-2 text-gray-600">Start your communication journey with Locuta.ai</p>
+          <h2 className="text-3xl font-bold text-gray-900">Create Admin Account</h2>
+          <p className="mt-2 text-gray-600">Set up your institution and start managing students</p>
         </div>
 
         <form onSubmit={handleEmailSignup} className="mt-8 space-y-6">
@@ -243,6 +243,22 @@ export default function SignupPage() {
           </svg>
           Continue with Google
         </button>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-4 bg-white text-gray-500">Or</span>
+          </div>
+        </div>
+
+        <Link
+          href="/auth/student-login"
+          className="block w-full text-center px-6 py-3 border-2 border-purple-200 bg-purple-50 text-purple-700 rounded-lg font-semibold hover:bg-purple-100 transition-all mb-6"
+        >
+          Student Login
+        </Link>
 
         <p className="text-center text-sm text-gray-600">
           Already have an account?{' '}

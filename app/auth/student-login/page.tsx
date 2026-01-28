@@ -94,10 +94,27 @@ export default function StudentLoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <Link href="/auth/login" className="text-sm text-purple-600 hover:text-purple-700">
-              School Admin Login →
+          <div className="mt-6 space-y-3">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-white text-slate-500">Or</span>
+              </div>
+            </div>
+            <Link
+              href="/auth/login"
+              className="block w-full text-center px-6 py-3 border-2 border-purple-200 bg-purple-50 text-purple-700 rounded-xl font-semibold hover:bg-purple-100 transition-all"
+            >
+              Admin Login
             </Link>
+            <p className="text-center text-sm text-slate-600">
+              Need an account?{' '}
+              <Link href="/auth/signup" className="text-purple-600 hover:text-purple-700 font-medium">
+                Sign up as Admin
+              </Link>
+            </p>
           </div>
         </div>
       </div>
