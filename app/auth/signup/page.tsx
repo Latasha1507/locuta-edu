@@ -34,6 +34,9 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: fullName,
+            // Mark institute signup as admin by default
+            is_admin: true,
+            account_type: 'admin',
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -83,7 +86,8 @@ export default function SignupPage() {
           redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent',
+            // Always show account chooser
+            prompt: 'select_account',
           },
         },
       })

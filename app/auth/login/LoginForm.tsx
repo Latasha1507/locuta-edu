@@ -3,10 +3,15 @@
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useState } from 'react'
 
 export default function LoginForm() {
   const searchParams = useSearchParams()
   const error = searchParams?.get('error')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
 
   const handleGoogleLogin = async () => {
     const supabase = createClient()
@@ -14,8 +19,31 @@ export default function LoginForm() {
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        // Always show account chooser (don’t auto-use last session)
+        queryParams: { prompt: 'select_account' },
       },
     })
+  }
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormError('')
+    setSubmitting(true)
+    try {
+      const supabase = createClient()
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (signInError) throw signInError
+      // Redirect happens via dashboard auth check
+      window.location.href = '/dashboard'
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Invalid email or password'
+      setFormError(msg)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -28,11 +56,52 @@ export default function LoginForm() {
             <p className="text-slate-600">Sign in to manage your institution</p>
           </div>
 
-          {error && (
+          {(error || formError) && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-700 text-sm">Authentication failed. Please try again.</p>
+              <p className="text-red-700 text-sm">
+                {formError || 'Authentication failed. Please try again.'}
+              </p>
             </div>
           )}
+
+          <form onSubmit={handlePasswordLogin} className="space-y-4 mb-6">
+            <div>
+              <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="admin@school.edu"
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-2">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="••••••••"
+                minLength={6}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-bold hover:shadow-lg transition-all disabled:opacity-60"
+            >
+              {submitting ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
 
           <button
             onClick={handleGoogleLogin}

@@ -8,29 +8,7 @@ import { useRouter } from 'next/navigation'
 
 // Admin Dashboard Component
 function AdminDashboard({ user }: { user: any }) {
-  const [students, setStudents] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const loadStudents = async () => {
-      try {
-        const supabase = createClient()
-        const { data } = await supabase
-          .from('profiles')
-          .select('id, full_name, created_at')
-          .eq('account_type', 'student')
-          .order('created_at', { ascending: false })
-          .limit(100)
-        
-        setStudents(data || [])
-      } catch (err) {
-        console.error('Error loading students:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadStudents()
-  }, [])
+  const [segment, setSegment] = useState<'both' | 'ms' | 'hs'>('both')
 
   const middleSchoolCategories = [
     { id: 'public-speaking-fundamentals', name: 'Public Speaking Fundamentals', icon: '🎤', color: 'from-purple-500 to-pink-500' },
@@ -49,6 +27,23 @@ function AdminDashboard({ user }: { user: any }) {
     { id: 'entrepreneurial-sales', name: 'Entrepreneurial & Sales Communication', icon: '💼', color: 'from-orange-600 to-red-600' },
     { id: 'debate-advanced-persuasion', name: 'Debate & Advanced Persuasion', icon: '⚖️', color: 'from-indigo-600 to-blue-600' }
   ]
+
+  const categoriesToShow =
+    segment === 'ms' ? middleSchoolCategories : segment === 'hs' ? highSchoolCategories : [...middleSchoolCategories, ...highSchoolCategories]
+
+  const CategoryTile = ({ cat }: { cat: { id: string; name: string; icon: string; color: string } }) => (
+    <Link
+      href={`/category/${cat.id}`}
+      className={`bg-gradient-to-br ${cat.color} rounded-xl p-4 text-white hover:shadow-lg transition-all hover:scale-[1.02] min-h-[104px] flex flex-col justify-between`}
+    >
+      <div className="flex items-start justify-between">
+        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">
+          {cat.icon}
+        </div>
+      </div>
+      <div className="text-sm font-semibold leading-snug mt-3">{cat.name}</div>
+    </Link>
+  )
 
   return (
     <div className="space-y-6">
@@ -85,82 +80,43 @@ function AdminDashboard({ user }: { user: any }) {
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center text-xl">👥</div>
             <div>
               <div className="font-bold text-sm">Total Students</div>
-              <div className="text-lg font-bold">{students.length}</div>
+              <div className="text-xs text-white/80">Coming soon</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Lesson Modules - Middle School */}
-      <div>
-        <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
-          <span>📚</span> Middle School (5th-8th Grade) Categories
+      {/* Content selector + categories */}
+      <div className="flex items-center justify-between gap-4">
+        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <span>📚</span> Curriculum Categories
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {middleSchoolCategories.map((cat) => (
-            <Link
-              key={cat.id}
-              href={`/category/${cat.id}`}
-              className={`bg-gradient-to-br ${cat.color} rounded-lg p-3 text-white hover:shadow-lg transition-all hover:scale-105`}
-            >
-              <div className="text-2xl mb-2">{cat.icon}</div>
-              <div className="text-xs font-semibold leading-tight">{cat.name}</div>
-            </Link>
-          ))}
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-slate-600 font-medium">Show:</span>
+          <select
+            value={segment}
+            onChange={(e) => setSegment(e.target.value as any)}
+            className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800 font-semibold"
+          >
+            <option value="both">Middle + High</option>
+            <option value="ms">Middle School (5-8)</option>
+            <option value="hs">High School (9-12)</option>
+          </select>
         </div>
       </div>
 
-      {/* Lesson Modules - High School */}
-      <div>
-        <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
-          <span>🎓</span> High School (9th-12th Grade) Categories
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {highSchoolCategories.map((cat) => (
-            <Link
-              key={cat.id}
-              href={`/category/${cat.id}`}
-              className={`bg-gradient-to-br ${cat.color} rounded-lg p-3 text-white hover:shadow-lg transition-all hover:scale-105`}
-            >
-              <div className="text-2xl mb-2">{cat.icon}</div>
-              <div className="text-xs font-semibold leading-tight">{cat.name}</div>
-            </Link>
-          ))}
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {categoriesToShow.map((cat) => (
+          <CategoryTile key={cat.id} cat={cat} />
+        ))}
       </div>
 
       {/* Recent Students */}
       <div>
         <h3 className="text-lg font-bold text-slate-900 mb-3">Recent Students</h3>
         <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-700">Name</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-700">Created</th>
-                  <th className="px-4 py-2 text-left font-semibold text-slate-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.slice(0, 10).map((student) => (
-                  <tr key={student.id} className="border-t border-slate-100 hover:bg-slate-50">
-                    <td className="px-4 py-2">{student.full_name || 'N/A'}</td>
-                    <td className="px-4 py-2 text-slate-600">
-                      {new Date(student.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-2">
-                      <Link
-                        href={`/admin/student/${student.id}`}
-                        className="text-indigo-600 hover:text-indigo-700 text-xs font-medium"
-                      >
-                        View Progress
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-4 text-sm text-slate-600">
+            Student lists, bulk creation, and class-section analytics will be connected once student roster fields are stored in `profiles` (grade/section/roll) and/or an admin roster table is added.
           </div>
         </div>
       </div>
@@ -294,7 +250,7 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
             </span>
           </h2>
           <p className="text-sm text-slate-600 mt-1">
-            {isMiddleSchool ? 'Middle School' : 'High School'} • Grade {grade || 'N/A'}
+            {grade === null ? 'Grade not set' : (isMiddleSchool ? 'Middle School' : 'High School')} • Grade {grade ?? '—'}
           </p>
         </div>
       </div>
@@ -349,15 +305,15 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
         <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
           <span>🎯</span> Practice Categories
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {categoryStats.map((category: any) => (
             <Link key={category.id} href={`/category/${category.id}`} className="group">
-              <div className="bg-white rounded-lg border-2 border-slate-200 hover:border-purple-300 hover:shadow-lg transition-all p-3">
-                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${category.color} flex items-center justify-center mb-2 text-lg`}>
+              <div className="bg-white rounded-xl border-2 border-slate-200 hover:border-purple-300 hover:shadow-lg transition-all p-4 min-h-[128px] flex flex-col">
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${category.color} flex items-center justify-center mb-3 text-xl`}>
                   {category.icon}
                 </div>
-                <h4 className="text-xs font-bold text-slate-900 mb-1 leading-tight">{category.name}</h4>
-                <div className="flex items-center justify-between text-xs mb-2">
+                <h4 className="text-sm font-bold text-slate-900 mb-2 leading-snug line-clamp-2">{category.name}</h4>
+                <div className="flex items-center justify-between text-xs mb-3 mt-auto">
                   <span className="text-slate-600">{category.completedLessons}/{category.totalLessons}</span>
                   {category.completionPercentage > 0 && (
                     <span className="text-purple-600 font-semibold">{category.completionPercentage}%</span>
@@ -431,12 +387,16 @@ export default function DashboardPage() {
 
         setUser(user)
         
-        // Check if admin
-        const adminStatus = await isAdminClient()
-        setIsUserAdmin(adminStatus)
-        
-        // Get grade for students
-        if (!adminStatus && user.user_metadata?.account_type === 'student') {
+        // Admin detection:
+        // - students: user_metadata.account_type === 'student'
+        // - admins: user_metadata.is_admin === true OR account_type !== 'student' (including undefined for older admin accounts)
+        const metaAccountType = user.user_metadata?.account_type
+        const metaIsAdmin = user.user_metadata?.is_admin === true
+        const isAdmin = metaIsAdmin || metaAccountType !== 'student'
+        setIsUserAdmin(isAdmin)
+
+        // Get grade for students (from metadata set during student creation)
+        if (!isAdmin && metaAccountType === 'student') {
           const gradeValue = user.user_metadata?.grade || null
           setGrade(gradeValue ? parseInt(gradeValue) : null)
         }
