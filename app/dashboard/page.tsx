@@ -301,35 +301,33 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
       </div>
 
       {/* Categories - Compact Grid */}
-      <div>
-        <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
-          <span>🎯</span> Practice Categories
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          {categoryStats.map((category: any) => (
-            <Link key={category.id} href={`/category/${category.id}`} className="group">
-              <div className="bg-white rounded-xl border-2 border-slate-200 hover:border-purple-300 hover:shadow-lg transition-all p-4 min-h-[128px] flex flex-col">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${category.color} flex items-center justify-center mb-3 text-xl`}>
-                  {category.icon}
-                </div>
-                <h4 className="text-sm font-bold text-slate-900 mb-2 leading-snug line-clamp-2">{category.name}</h4>
-                <div className="flex items-center justify-between text-xs mb-3 mt-auto">
-                  <span className="text-slate-600">{category.completedLessons}/{category.totalLessons}</span>
-                  {category.completionPercentage > 0 && (
-                    <span className="text-purple-600 font-semibold">{category.completionPercentage}%</span>
-                  )}
-                </div>
-                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full bg-gradient-to-r ${category.color} rounded-full transition-all`}
-                    style={{ width: `${category.completionPercentage}%` }}
-                  />
-                </div>
-              </div>
-            </Link>
-          ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+  {categoryStats.map((category: any) => (
+    <Link key={category.id} href={`/category/${category.id}`} className="group">
+      <div className="bg-white rounded-xl border-2 border-slate-200 hover:border-purple-300 hover:shadow-lg transition-all p-4 h-[160px] flex flex-col">
+        {/* Fixed height: h-[160px] */}
+        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${category.color} flex items-center justify-center mb-3 text-xl flex-shrink-0`}>
+          {category.icon}
+        </div>
+        <h4 className="text-sm font-bold text-slate-900 mb-2 leading-snug line-clamp-2 flex-grow">
+          {category.name}
+        </h4>
+        <div className="flex items-center justify-between text-xs mb-2">
+          <span className="text-slate-600">{category.completedLessons}/{category.totalLessons}</span>
+          {category.completionPercentage > 0 && (
+            <span className="text-purple-600 font-semibold">{category.completionPercentage}%</span>
+          )}
+        </div>
+        <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+          <div 
+            className={`h-full bg-gradient-to-r ${category.color} rounded-full transition-all`}
+            style={{ width: `${category.completionPercentage}%` }}
+          />
         </div>
       </div>
+    </Link>
+  ))}
+</div>
 
       {/* Recent History */}
       <div>

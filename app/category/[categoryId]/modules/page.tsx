@@ -35,7 +35,7 @@ const CATEGORY_COLORS: { [key: string]: string } = {
   'debate-advanced-persuasion': 'from-cyan-400 to-blue-500'
 }
 
-export default async function CategoryPage({
+export default async function ModulesPage({
   params,
 }: {
   params: Promise<{ categoryId: string }>
@@ -49,14 +49,8 @@ export default async function CategoryPage({
   const categoryName = CATEGORY_MAP[categoryId]
   if (!categoryName) notFound()
 
-  // Get user's grade from profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('grade, full_name')
-    .eq('id', user.id)
-    .single()
-
-  const userGrade = profile?.grade || 5 // Default to grade 5 if not set
+  // Get user's grade from metadata
+  const userGrade = user.user_metadata?.grade || 5
 
   // Get all lessons for this category
   const { data: lessons } = await supabase
