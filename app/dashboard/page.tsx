@@ -3,7 +3,6 @@
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { isAdminClient } from '@/lib/admin-client'
 import { useRouter } from 'next/navigation'
 
 // Admin Dashboard Component
@@ -11,21 +10,21 @@ function AdminDashboard({ user }: { user: any }) {
   const [segment, setSegment] = useState<'both' | 'ms' | 'hs'>('both')
 
   const middleSchoolCategories = [
-    { id: 'public-speaking-fundamentals', name: 'Public Speaking Fundamentals', icon: '🎤', color: 'from-purple-500 to-pink-500' },
-    { id: 'storytelling', name: 'Storytelling', icon: '📖', color: 'from-blue-500 to-cyan-500' },
-    { id: 'leadership-team-communication', name: 'Leadership & Team Communication', icon: '👥', color: 'from-green-500 to-emerald-500' },
-    { id: 'conversation-skills', name: 'Conversation Skills', icon: '💬', color: 'from-yellow-500 to-orange-500' },
-    { id: 'project-academic-presentation', name: 'Project & Academic Presentation Skills', icon: '📊', color: 'from-red-500 to-pink-500' },
-    { id: 'persuasive-speaking', name: 'Persuasive Speaking', icon: '🎯', color: 'from-indigo-500 to-purple-500' }
+    { id: 'public-speaking-fundamentals', name: 'Public Speaking', icon: '🎤', color: 'from-purple-500 to-pink-500', dbName: 'Public Speaking Fundamentals' },
+    { id: 'storytelling', name: 'Storytelling', icon: '📖', color: 'from-blue-500 to-cyan-500', dbName: 'Storytelling' },
+    { id: 'leadership-team-communication', name: 'Leadership & Teams', icon: '👥', color: 'from-green-500 to-emerald-500', dbName: 'Leadership & Team Communication' },
+    { id: 'conversation-skills', name: 'Conversation Skills', icon: '💬', color: 'from-yellow-500 to-orange-500', dbName: 'Conversation Skills' },
+    { id: 'project-academic-presentation', name: 'Presentations', icon: '📊', color: 'from-red-500 to-pink-500', dbName: 'Project & Academic Presentation Skills' },
+    { id: 'persuasive-speaking', name: 'Persuasive Speaking', icon: '🎯', color: 'from-indigo-500 to-purple-500', dbName: 'Persuasive Speaking' }
   ]
 
   const highSchoolCategories = [
-    { id: 'public-speaking-mastery', name: 'Public Speaking Mastery', icon: '🎤', color: 'from-purple-600 to-indigo-600' },
-    { id: 'advanced-storytelling', name: 'Advanced Storytelling & Content', icon: '📖', color: 'from-blue-600 to-purple-600' },
-    { id: 'leadership-team-advanced', name: 'Leadership & Team Communication (Advanced)', icon: '👥', color: 'from-green-600 to-teal-600' },
-    { id: 'content-creation-digital', name: 'Content Creation & Digital Communication', icon: '🎥', color: 'from-pink-600 to-rose-600' },
-    { id: 'entrepreneurial-sales', name: 'Entrepreneurial & Sales Communication', icon: '💼', color: 'from-orange-600 to-red-600' },
-    { id: 'debate-advanced-persuasion', name: 'Debate & Advanced Persuasion', icon: '⚖️', color: 'from-indigo-600 to-blue-600' }
+    { id: 'public-speaking-mastery', name: 'Public Speaking Mastery', icon: '🎤', color: 'from-purple-600 to-indigo-600', dbName: 'Public Speaking Mastery' },
+    { id: 'advanced-storytelling', name: 'Advanced Storytelling', icon: '📖', color: 'from-blue-600 to-purple-600', dbName: 'Advanced Storytelling & Content' },
+    { id: 'leadership-team-advanced', name: 'Leadership (Advanced)', icon: '👥', color: 'from-green-600 to-teal-600', dbName: 'Leadership & Team Communication (Advanced)' },
+    { id: 'content-creation-digital', name: 'Digital Communication', icon: '🎥', color: 'from-pink-600 to-rose-600', dbName: 'Content Creation & Digital Communication' },
+    { id: 'entrepreneurial-sales', name: 'Sales & Entrepreneurship', icon: '💼', color: 'from-orange-600 to-red-600', dbName: 'Entrepreneurial & Sales Communication' },
+    { id: 'debate-advanced-persuasion', name: 'Debate & Persuasion', icon: '⚖️', color: 'from-indigo-600 to-blue-600', dbName: 'Debate & Advanced Persuasion' }
   ]
 
   const categoriesToShow =
@@ -34,14 +33,12 @@ function AdminDashboard({ user }: { user: any }) {
   const CategoryTile = ({ cat }: { cat: { id: string; name: string; icon: string; color: string } }) => (
     <Link
       href={`/category/${cat.id}`}
-      className={`bg-gradient-to-br ${cat.color} rounded-xl p-4 text-white hover:shadow-lg transition-all hover:scale-[1.02] min-h-[104px] flex flex-col justify-between`}
+      className={`bg-gradient-to-br ${cat.color} rounded-xl p-4 text-white hover:shadow-lg transition-all hover:scale-[1.02] h-[120px] flex flex-col justify-between`}
     >
-      <div className="flex items-start justify-between">
-        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">
-          {cat.icon}
-        </div>
+      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">
+        {cat.icon}
       </div>
-      <div className="text-sm font-semibold leading-snug mt-3">{cat.name}</div>
+      <div className="text-sm font-semibold leading-snug">{cat.name}</div>
     </Link>
   )
 
@@ -57,7 +54,7 @@ function AdminDashboard({ user }: { user: any }) {
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center text-xl">👨‍🎓</div>
             <div>
               <div className="font-bold text-sm">Create Student</div>
-              <div className="text-xs text-white/80">Add single student</div>
+              <div className="text-xs text-white/80">Add new student account</div>
             </div>
           </div>
         </Link>
@@ -79,7 +76,7 @@ function AdminDashboard({ user }: { user: any }) {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center text-xl">👥</div>
             <div>
-              <div className="font-bold text-sm">Total Students</div>
+              <div className="font-bold text-sm">Student Management</div>
               <div className="text-xs text-white/80">Coming soon</div>
             </div>
           </div>
@@ -98,26 +95,26 @@ function AdminDashboard({ user }: { user: any }) {
             onChange={(e) => setSegment(e.target.value as any)}
             className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800 font-semibold"
           >
-            <option value="both">Middle + High</option>
+            <option value="both">All Categories</option>
             <option value="ms">Middle School (5-8)</option>
             <option value="hs">High School (9-12)</option>
           </select>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
         {categoriesToShow.map((cat) => (
           <CategoryTile key={cat.id} cat={cat} />
         ))}
       </div>
 
-      {/* Recent Students */}
+      {/* Recent Activity */}
       <div>
-        <h3 className="text-lg font-bold text-slate-900 mb-3">Recent Students</h3>
-        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-          <div className="p-4 text-sm text-slate-600">
-            Student lists, bulk creation, and class-section analytics will be connected once student roster fields are stored in `profiles` (grade/section/roll) and/or an admin roster table is added.
-          </div>
+        <h3 className="text-lg font-bold text-slate-900 mb-3">Recent Activity</h3>
+        <div className="bg-white rounded-lg border border-slate-200 p-4">
+          <p className="text-sm text-slate-600">
+            Student management, class analytics, and activity tracking coming soon.
+          </p>
         </div>
       </div>
     </div>
@@ -166,29 +163,29 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
   const isMiddleSchool = grade !== null && grade >= 5 && grade <= 8
   
   const categories = isMiddleSchool ? [
-    { id: 'public-speaking-fundamentals', name: 'Public Speaking Fundamentals', description: 'Master presentations and speeches', icon: '🎤', color: 'from-purple-500 to-pink-500' },
-    { id: 'storytelling', name: 'Storytelling', description: 'Craft compelling narratives', icon: '📖', color: 'from-blue-500 to-cyan-500' },
-    { id: 'leadership-team-communication', name: 'Leadership & Team Communication', description: 'Build confidence in leading groups', icon: '👥', color: 'from-green-500 to-emerald-500' },
-    { id: 'conversation-skills', name: 'Conversation Skills', description: 'Build confidence in social interactions', icon: '💬', color: 'from-yellow-500 to-orange-500' },
-    { id: 'project-academic-presentation', name: 'Project & Academic Presentation Skills', description: 'Excel in classroom presentations', icon: '📊', color: 'from-red-500 to-pink-500' },
-    { id: 'persuasive-speaking', name: 'Persuasive Speaking', description: 'Master persuasive communication', icon: '🎯', color: 'from-indigo-500 to-purple-500' }
+    { id: 'public-speaking-fundamentals', name: 'Public Speaking', description: 'Master presentations', icon: '🎤', color: 'from-purple-500 to-pink-500', dbName: 'Public Speaking Fundamentals' },
+    { id: 'storytelling', name: 'Storytelling', description: 'Craft narratives', icon: '📖', color: 'from-blue-500 to-cyan-500', dbName: 'Storytelling' },
+    { id: 'leadership-team-communication', name: 'Leadership & Teams', description: 'Lead groups', icon: '👥', color: 'from-green-500 to-emerald-500', dbName: 'Leadership & Team Communication' },
+    { id: 'conversation-skills', name: 'Conversation Skills', description: 'Social interactions', icon: '💬', color: 'from-yellow-500 to-orange-500', dbName: 'Conversation Skills' },
+    { id: 'project-academic-presentation', name: 'Presentations', description: 'Classroom presentations', icon: '📊', color: 'from-red-500 to-pink-500', dbName: 'Project & Academic Presentation Skills' },
+    { id: 'persuasive-speaking', name: 'Persuasive Speaking', description: 'Persuasive communication', icon: '🎯', color: 'from-indigo-500 to-purple-500', dbName: 'Persuasive Speaking' }
   ] : [
-    { id: 'public-speaking-mastery', name: 'Public Speaking Mastery', description: 'Advanced presentation techniques', icon: '🎤', color: 'from-purple-600 to-indigo-600' },
-    { id: 'advanced-storytelling', name: 'Advanced Storytelling & Content', description: 'Create impactful narratives', icon: '📖', color: 'from-blue-600 to-purple-600' },
-    { id: 'leadership-team-advanced', name: 'Leadership & Team Communication (Advanced)', description: 'Lead teams effectively', icon: '👥', color: 'from-green-600 to-teal-600' },
-    { id: 'content-creation-digital', name: 'Content Creation & Digital Communication', description: 'Engage digital audiences', icon: '🎥', color: 'from-pink-600 to-rose-600' },
-    { id: 'entrepreneurial-sales', name: 'Entrepreneurial & Sales Communication', description: 'Master sales and pitches', icon: '💼', color: 'from-orange-600 to-red-600' },
-    { id: 'debate-advanced-persuasion', name: 'Debate & Advanced Persuasion', description: 'Advanced debate skills', icon: '⚖️', color: 'from-indigo-600 to-blue-600' }
+    { id: 'public-speaking-mastery', name: 'Public Speaking Mastery', description: 'Advanced techniques', icon: '🎤', color: 'from-purple-600 to-indigo-600', dbName: 'Public Speaking Mastery' },
+    { id: 'advanced-storytelling', name: 'Advanced Storytelling', description: 'Impactful narratives', icon: '📖', color: 'from-blue-600 to-purple-600', dbName: 'Advanced Storytelling & Content' },
+    { id: 'leadership-team-advanced', name: 'Leadership (Advanced)', description: 'Lead teams', icon: '👥', color: 'from-green-600 to-teal-600', dbName: 'Leadership & Team Communication (Advanced)' },
+    { id: 'content-creation-digital', name: 'Digital Communication', description: 'Digital audiences', icon: '🎥', color: 'from-pink-600 to-rose-600', dbName: 'Content Creation & Digital Communication' },
+    { id: 'entrepreneurial-sales', name: 'Sales & Entrepreneurship', description: 'Sales and pitches', icon: '💼', color: 'from-orange-600 to-red-600', dbName: 'Entrepreneurial & Sales Communication' },
+    { id: 'debate-advanced-persuasion', name: 'Debate & Persuasion', description: 'Advanced debate', icon: '⚖️', color: 'from-indigo-600 to-blue-600', dbName: 'Debate & Advanced Persuasion' }
   ]
 
   const categoryStats = categories.map(category => {
     const categoryLessons = lessons?.filter((l: any) => 
-      l.category.toLowerCase().replace(/\s+/g, '-') === category.id
+      l.category === category.dbName
     ) || []
     
     const totalLessons = categoryLessons.length
     const categoryProgress = progress?.filter((p: any) => 
-      p.category.toLowerCase().replace(/\s+/g, '-') === category.id
+      p.category === category.dbName
     ) || []
     
     const completedLessons = categoryProgress.filter((p: any) => p.completed).length
@@ -255,7 +252,7 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
         </div>
       </div>
 
-      {/* XP Progress Bar - Compact */}
+      {/* XP Progress Bar */}
       <div className="bg-gradient-to-r from-purple-100 via-pink-100 to-yellow-100 rounded-lg p-3 border border-purple-200">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -272,7 +269,7 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
         </div>
       </div>
 
-      {/* Stats Cards - Compact */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3 border border-purple-200">
           <div className="text-xs font-semibold text-slate-700 mb-1">Progress</div>
@@ -300,34 +297,38 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
         </div>
       </div>
 
-      {/* Categories - Compact Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-  {categoryStats.map((category: any) => (
-    <Link key={category.id} href={`/category/${category.id}`} className="group">
-      <div className="bg-white rounded-xl border-2 border-slate-200 hover:border-purple-300 hover:shadow-lg transition-all p-4 h-[160px] flex flex-col">
-        {/* Fixed height: h-[160px] */}
-        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${category.color} flex items-center justify-center mb-3 text-xl flex-shrink-0`}>
-          {category.icon}
-        </div>
-        <h4 className="text-sm font-bold text-slate-900 mb-2 leading-snug line-clamp-2 flex-grow">
-          {category.name}
-        </h4>
-        <div className="flex items-center justify-between text-xs mb-2">
-          <span className="text-slate-600">{category.completedLessons}/{category.totalLessons}</span>
-          {category.completionPercentage > 0 && (
-            <span className="text-purple-600 font-semibold">{category.completionPercentage}%</span>
-          )}
-        </div>
-        <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-          <div 
-            className={`h-full bg-gradient-to-r ${category.color} rounded-full transition-all`}
-            style={{ width: `${category.completionPercentage}%` }}
-          />
+      {/* Categories - 3x2 Grid */}
+      <div>
+        <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+          <span>🎯</span> Practice Categories
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {categoryStats.map((category: any) => (
+            <Link key={category.id} href={`/category/${category.id}`} className="group">
+              <div className="bg-white rounded-xl border-2 border-slate-200 hover:border-purple-300 hover:shadow-lg transition-all p-4 h-[140px] flex flex-col">
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${category.color} flex items-center justify-center mb-2 text-lg flex-shrink-0`}>
+                  {category.icon}
+                </div>
+                <h4 className="text-xs font-bold text-slate-900 mb-2 leading-tight line-clamp-2 flex-grow">
+                  {category.name}
+                </h4>
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <span className="text-slate-600">{category.completedLessons}/{category.totalLessons}</span>
+                  {category.completionPercentage > 0 && (
+                    <span className="text-purple-600 font-semibold">{category.completionPercentage}%</span>
+                  )}
+                </div>
+                <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full bg-gradient-to-r ${category.color} rounded-full transition-all`}
+                    style={{ width: `${category.completionPercentage}%` }}
+                  />
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
-    </Link>
-  ))}
-</div>
 
       {/* Recent History */}
       <div>
@@ -354,7 +355,7 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
             ))}
             {allSessions.length === 0 && (
               <div className="p-4 text-center text-sm text-slate-500">
-                No practice sessions yet. Start practicing to see your history!
+                No practice sessions yet. Start practicing!
               </div>
             )}
           </div>
@@ -385,15 +386,13 @@ export default function DashboardPage() {
 
         setUser(user)
         
-        // Admin detection:
-        // - students: user_metadata.account_type === 'student'
-        // - admins: user_metadata.is_admin === true OR account_type !== 'student' (including undefined for older admin accounts)
+        // Check if admin or student
         const metaAccountType = user.user_metadata?.account_type
         const metaIsAdmin = user.user_metadata?.is_admin === true
         const isAdmin = metaIsAdmin || metaAccountType !== 'student'
         setIsUserAdmin(isAdmin)
 
-        // Get grade for students (from metadata set during student creation)
+        // Get grade for students
         if (!isAdmin && metaAccountType === 'student') {
           const gradeValue = user.user_metadata?.grade || null
           setGrade(gradeValue ? parseInt(gradeValue) : null)
@@ -443,7 +442,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-tr from-[#edf2f7] to-[#f7f9fb] flex">
-      {/* Sidebar - Compact */}
+      {/* Sidebar */}
       <aside className="hidden md:flex flex-col justify-between h-screen w-20 lg:w-56 sticky top-0 left-0 bg-white/80 backdrop-blur-xl border-r border-slate-200 shadow-sm">
         <div>
           <div className="px-3 py-4 flex items-center justify-center lg:justify-start gap-2">
@@ -464,12 +463,6 @@ export default function DashboardPage() {
           </nav>
         </div>
         <div className="mb-4 px-3">
-          {isUserAdmin && (
-            <Link href="/admin" className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-semibold mb-2 hover:shadow-md transition-all">
-              <span>🔑</span>
-              <span className="hidden lg:inline">Admin</span>
-            </Link>
-          )}
           <form action="/auth/signout" method="post" className="w-full">
             <button type="submit" className="flex items-center gap-2 w-full bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:shadow-md transition-all">
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

@@ -3,7 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 
 const CATEGORY_MAP: { [key: string]: string } = {
-  // Middle School (Grades 5-8)
+  // Middle School - EXACT names from database
   'public-speaking-fundamentals': 'Public Speaking Fundamentals',
   'storytelling': 'Storytelling',
   'leadership-team-communication': 'Leadership & Team Communication',
@@ -11,7 +11,7 @@ const CATEGORY_MAP: { [key: string]: string } = {
   'project-academic-presentation': 'Project & Academic Presentation Skills',
   'persuasive-speaking': 'Persuasive Speaking',
   
-  // High School (Grades 9-12)
+  // High School - EXACT names from database
   'public-speaking-mastery': 'Public Speaking Mastery',
   'advanced-storytelling': 'Advanced Storytelling & Content',
   'leadership-team-advanced': 'Leadership & Team Communication (Advanced)',
