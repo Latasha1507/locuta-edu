@@ -14,7 +14,7 @@ function AdminDashboard({ user }: { user: any }) {
     { id: 'storytelling', name: 'Storytelling', icon: '📖', color: 'from-blue-500 to-cyan-500', dbName: 'Storytelling' },
     { id: 'leadership-team-communication', name: 'Leadership & Teams', icon: '👥', color: 'from-green-500 to-emerald-500', dbName: 'Leadership & Team Communication' },
     { id: 'conversation-skills', name: 'Conversation Skills', icon: '💬', color: 'from-yellow-500 to-orange-500', dbName: 'Conversation Skills' },
-    { id: 'project-academic-presentation', name: 'Presentations', icon: '📊', color: 'from-red-500 to-pink-500', dbName: 'Project & Academic Presentation Skills' },
+    { id: 'project-academic-presentation', name: 'Project & Academic', icon: '📊', color: 'from-red-500 to-pink-500', dbName: 'Project & Academic Presentation' },
     { id: 'persuasive-speaking', name: 'Persuasive Speaking', icon: '🎯', color: 'from-indigo-500 to-purple-500', dbName: 'Persuasive Speaking' }
   ]
 
@@ -29,6 +29,18 @@ function AdminDashboard({ user }: { user: any }) {
 
   const categoriesToShow =
     segment === 'ms' ? middleSchoolCategories : segment === 'hs' ? highSchoolCategories : [...middleSchoolCategories, ...highSchoolCategories]
+
+  const CategoryTile = ({ cat }: { cat: { id: string; name: string; icon: string; color: string } }) => (
+    <Link
+      href={`/category/${cat.id}`}
+      className={`bg-gradient-to-br ${cat.color} rounded-xl p-4 text-white hover:shadow-lg transition-all hover:scale-[1.02] h-[120px] flex flex-col justify-between`}
+    >
+      <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">
+        {cat.icon}
+      </div>
+      <div className="text-sm font-semibold leading-snug">{cat.name}</div>
+    </Link>
+  )
 
   return (
     <div className="space-y-6">
@@ -92,16 +104,7 @@ function AdminDashboard({ user }: { user: any }) {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
         {categoriesToShow.map((cat) => (
-          <Link
-            key={cat.id}
-            href={`/category/${cat.id}`}
-            className={`bg-gradient-to-br ${cat.color} rounded-xl p-4 text-white hover:shadow-lg transition-all hover:scale-[1.02] h-[120px] flex flex-col justify-between`}
-          >
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">
-              {cat.icon}
-            </div>
-            <div className="text-sm font-semibold leading-snug">{cat.name}</div>
-          </Link>
+          <CategoryTile key={cat.id} cat={cat} />
         ))}
       </div>
 
@@ -164,7 +167,7 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
     { id: 'storytelling', name: 'Storytelling', description: 'Craft narratives', icon: '📖', color: 'from-blue-500 to-cyan-500', dbName: 'Storytelling' },
     { id: 'leadership-team-communication', name: 'Leadership & Teams', description: 'Lead groups', icon: '👥', color: 'from-green-500 to-emerald-500', dbName: 'Leadership & Team Communication' },
     { id: 'conversation-skills', name: 'Conversation Skills', description: 'Social interactions', icon: '💬', color: 'from-yellow-500 to-orange-500', dbName: 'Conversation Skills' },
-    { id: 'project-academic-presentation', name: 'Presentations', description: 'Classroom presentations', icon: '📊', color: 'from-red-500 to-pink-500', dbName: 'Project & Academic Presentation Skills' },
+    { id: 'project-academic-presentation', name: 'Project & Academic', description: 'Classroom presentations', icon: '📊', color: 'from-red-500 to-pink-500', dbName: 'Project & Academic Presentation' },
     { id: 'persuasive-speaking', name: 'Persuasive Speaking', description: 'Persuasive communication', icon: '🎯', color: 'from-indigo-500 to-purple-500', dbName: 'Persuasive Speaking' }
   ] : [
     { id: 'public-speaking-mastery', name: 'Public Speaking Mastery', description: 'Advanced techniques', icon: '🎤', color: 'from-purple-600 to-indigo-600', dbName: 'Public Speaking Mastery' },
@@ -294,7 +297,7 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
         </div>
       </div>
 
-      {/* Categories - 3x2 Grid */}
+      {/* Categories - 3x2 Grid with LARGER TEXT */}
       <div>
         <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
           <span>🎯</span> Practice Categories
@@ -302,20 +305,20 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {categoryStats.map((category: any) => (
             <Link key={category.id} href={`/category/${category.id}`} className="group">
-              <div className="bg-white rounded-2xl border-2 border-slate-200 hover:border-purple-400 hover:shadow-2xl transition-all duration-300 p-6 h-[180px] flex flex-col hover:-translate-y-1">
-                <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${category.color} flex items-center justify-center mb-4 text-2xl shadow-lg group-hover:scale-110 transition-transform flex-shrink-0`}>
+              <div className="bg-white rounded-2xl border-2 border-slate-200 hover:border-purple-400 hover:shadow-2xl transition-all duration-300 p-6 min-h-[200px] flex flex-col hover:-translate-y-1">
+                <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${category.color} flex items-center justify-center mb-4 text-3xl shadow-lg group-hover:scale-110 transition-transform flex-shrink-0`}>
                   {category.icon}
                 </div>
-                <h4 className="text-base font-bold text-slate-900 mb-3 leading-tight line-clamp-2 flex-grow group-hover:text-purple-700 transition-colors">
+                <h4 className="text-lg font-bold text-slate-900 mb-3 leading-tight flex-grow group-hover:text-purple-700 transition-colors">
                   {category.name}
                 </h4>
-                <div className="flex items-center justify-between text-sm mb-3">
+                <div className="flex items-center justify-between text-base mb-3">
                   <span className="text-slate-600 font-medium">{category.completedLessons}/{category.totalLessons} lessons</span>
                   {category.completionPercentage > 0 && (
-                    <span className="text-purple-600 font-bold">{category.completionPercentage}%</span>
+                    <span className="text-purple-600 font-bold text-lg">{category.completionPercentage}%</span>
                   )}
                 </div>
-                <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden shadow-inner">
                   <div 
                     className={`h-full bg-gradient-to-r ${category.color} rounded-full transition-all duration-500 shadow-lg`}
                     style={{ width: `${category.completionPercentage}%` }}
@@ -420,24 +423,20 @@ export default function DashboardPage() {
     {
       name: 'Dashboard',
       href: '/dashboard',
-      icon: (
-        <svg width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="14" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
-        </svg>
-      )
+      icon: <svg width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+      </svg>
     },
     {
       name: 'History',
       href: '/history',
-      icon: (
-        <svg width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-          <path d="M12 8v5l3 3" strokeLinecap="round" strokeLinejoin="round"/>
-          <circle cx="12" cy="12" r="9" />
-        </svg>
-      )
+      icon: <svg width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+        <path d="M12 8v5l3 3" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="12" cy="12" r="9" />
+      </svg>
     },
   ]
 
