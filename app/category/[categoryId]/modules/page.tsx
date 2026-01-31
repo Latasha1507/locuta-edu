@@ -53,12 +53,22 @@ export default async function ModulesPage({
   const userGrade = user.user_metadata?.grade || 5
 
   // Get all lessons for this category
-  const { data: lessons } = await supabase
+  const { data: lessons, error: lessonsError } = await supabase
     .from('lessons')
     .select('*')
     .eq('category', categoryName)
     .order('module_number', { ascending: true })
     .order('level_number', { ascending: true })
+
+  // ✅ DEBUG LOGGING
+  console.log('Modules Page Debug:', {
+    categoryId,
+    categoryName,
+    userGrade,
+    lessonsCount: lessons?.length || 0,
+    lessonsError,
+    firstLesson: lessons?.[0]
+  })
 
   // Get user progress
   const { data: progress } = await supabase
@@ -68,13 +78,13 @@ export default async function ModulesPage({
     .eq('category', categoryName)
 
   // Group lessons by module
-const modules: { [key: number]: any[] } = {}
-lessons?.forEach(lesson => {
-  if (!modules[lesson.module_number]) {  // ✅ FIXED - "lesson" not "lessons"
-    modules[lesson.module_number] = []
-  }
-  modules[lesson.module_number].push(lesson)
-})
+  const modules: { [key: number]: any[] } = {}
+  lessons?.forEach(lesson => {
+    if (!modules[lesson.module_number]) {
+      modules[lesson.module_number] = []
+    }
+    modules[lesson.module_number].push(lesson)
+  })
 
   const totalLessons = lessons?.length || 0
   const completedLessons = progress?.filter(p => p.completed).length || 0
@@ -138,7 +148,14 @@ lessons?.forEach(lesson => {
           <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
             <div className="text-6xl mb-4">📚</div>
             <h2 className="text-2xl font-bold text-slate-900 mb-2">No lessons yet</h2>
-            <p className="text-slate-600">Lessons for this category are coming soon!</p>
+            <p className="text-slate-600 mb-4">Lessons for this category are coming soon!</p>
+            {/* ✅ DEBUG INFO FOR TROUBLESHOOTING */}
+            <div className="mt-6 p-4 bg-gray-100 rounded-lg text-left text-sm">
+              <p className="font-mono text-gray-700">Category ID: {categoryId}</p>
+              <p className="font-mono text-gray-700">Category Name: {categoryName}</p>
+              <p className="font-mono text-gray-700">Lessons Found: {lessons?.length || 0}</p>
+              {lessonsError && <p className="font-mono text-red-600">Error: {lessonsError.message}</p>}
+            </div>
           </div>
         ) : (
           <div className="space-y-8">

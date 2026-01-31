@@ -15,13 +15,23 @@ const FEEDBACK_MESSAGES = [
   'Generating personalized feedback...',
 ]
 
+// ✅ FIXED - Updated to match modules page
 const CATEGORY_MAP: { [key: string]: string } = {
-  'public-speaking': 'Public Speaking',
+  // Middle School (Grades 5-8)
+  'public-speaking-fundamentals': 'Public Speaking Fundamentals',
   'storytelling': 'Storytelling',
-  'creator-speaking': 'Creator Speaking',
-  'casual-conversation': 'Casual Conversation',
-  'workplace-communication': 'Workplace Communication',
-  'pitch-anything': 'Pitch Anything',
+  'leadership-team-communication': 'Leadership & Team Communication',
+  'conversation-skills': 'Conversation Skills',
+  'project-academic-presentation': 'Project & Academic Presentation',
+  'persuasive-speaking': 'Persuasive Speaking',
+  
+  // High School (Grades 9-12)
+  'public-speaking-mastery': 'Public Speaking Mastery',
+  'advanced-storytelling': 'Advanced Storytelling & Content',
+  'leadership-team-advanced': 'Leadership & Team Communication (Advanced)',
+  'content-creation-digital': 'Content Creation & Digital Communication',
+  'entrepreneurial-sales': 'Entrepreneurial & Sales Communication',
+  'debate-advanced-persuasion': 'Debate & Advanced Persuasion'
 }
 
 export default function PracticePage() {
@@ -68,13 +78,31 @@ export default function PracticePage() {
   const loadLesson = async () => {
     try {
       const supabase = createClient()
-      const { data } = await supabase
+      
+      // ✅ Added debug logging
+      const categoryName = CATEGORY_MAP[categoryId]
+      console.log('Loading lesson:', { categoryId, categoryName, moduleId, lessonId })
+      
+      if (!categoryName) {
+        setError(`Invalid category: ${categoryId}`)
+        setStep('intro')
+        return
+      }
+      
+      const { data, error: queryError } = await supabase
         .from('lessons')
         .select('level_title, lesson_explanation, practice_prompt')
-        .eq('category', CATEGORY_MAP[categoryId])
+        .eq('category', categoryName)
         .eq('module_number', parseInt(moduleId))
         .eq('level_number', parseInt(lessonId))
         .single()
+
+      if (queryError) {
+        console.error('Query error:', queryError)
+        setError('Failed to load lesson')
+        setStep('intro')
+        return
+      }
 
       if (data) {
         setLessonData({
@@ -95,6 +123,7 @@ export default function PracticePage() {
         })
       }
     } catch (err) {
+      console.error('Load lesson error:', err)
       setError('Failed to load lesson')
       setStep('intro')
     }
@@ -208,7 +237,7 @@ export default function PracticePage() {
     <>
       <div className="bg-white/70 backdrop-blur-xl border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
-          <Link href={`/category/${categoryId}`} className="text-slate-700 hover:text-indigo-600 font-medium">
+          <Link href={`/category/${categoryId}/modules`} className="text-slate-700 hover:text-indigo-600 font-medium">
             ← Back
           </Link>
           <img src="/Icon.png" alt="Locuta" className="w-8 h-8" />
