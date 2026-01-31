@@ -3,15 +3,15 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 
 const CATEGORY_MAP: { [key: string]: string } = {
-  // Middle School - EXACT names from database
+  // Middle School (Grades 5-8)
   'public-speaking-fundamentals': 'Public Speaking Fundamentals',
   'storytelling': 'Storytelling',
   'leadership-team-communication': 'Leadership & Team Communication',
   'conversation-skills': 'Conversation Skills',
-  'project-academic-presentation': 'Project & Academic Presentation Skills',
+  'project-academic-presentation': 'Project & Academic Presentation',
   'persuasive-speaking': 'Persuasive Speaking',
   
-  // High School - EXACT names from database
+  // High School (Grades 9-12)
   'public-speaking-mastery': 'Public Speaking Mastery',
   'advanced-storytelling': 'Advanced Storytelling & Content',
   'leadership-team-advanced': 'Leadership & Team Communication (Advanced)',
@@ -68,13 +68,13 @@ export default async function ModulesPage({
     .eq('category', categoryName)
 
   // Group lessons by module
-  const modules: { [key: number]: any[] } = {}
-  lessons?.forEach(lesson => {
-    if (!modules[lesson.module_number]) {
-      modules[lesson.module_number] = []
-    }
-    modules[lesson.module_number].push(lesson)
-  })
+const modules: { [key: number]: any[] } = {}
+lessons?.forEach(lesson => {
+  if (!modules[lesson.module_number]) {  // ✅ FIXED - "lesson" not "lessons"
+    modules[lesson.module_number] = []
+  }
+  modules[lesson.module_number].push(lesson)
+})
 
   const totalLessons = lessons?.length || 0
   const completedLessons = progress?.filter(p => p.completed).length || 0
