@@ -68,6 +68,7 @@ export default function PracticePage() {
       audioRef.current = audio
 
       audio.addEventListener('loadedmetadata', () => {
+        console.log('✅ Audio loaded, duration:', audio.duration)
         setDuration(audio.duration)
       })
 
@@ -80,6 +81,9 @@ export default function PracticePage() {
         console.error('Audio playback error:', e)
         setError('Audio playback failed. You can still read the lesson.')
       })
+
+      // Force load metadata
+      audio.load()
 
       return () => {
         audio.pause()

@@ -36,37 +36,13 @@ export async function POST(request: Request) {
 
     const firstName = profile?.full_name?.split(' ')[0] || null
 
-    // Generate greeting audio if we have a first name
-    let greetingAudio = ''
-    let greetingText = ''
-
-    if (firstName) {
-      greetingText = `Hello, ${firstName}.`
-      console.log('👋 Generating greeting audio...')
-      
-      try {
-        const greetingResponse = await openai.audio.speech.create({
-          model: 'tts-1',
-          voice: voice as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
-          input: greetingText,
-          speed: 0.95,
-        })
-
-        const greetingBuffer = Buffer.from(await greetingResponse.arrayBuffer())
-        greetingAudio = greetingBuffer.toString('base64')
-        console.log('✅ Greeting audio generated')
-      } catch (err) {
-        console.error('⚠️ Greeting audio failed (non-critical):', err)
-        // Continue without greeting audio
-      }
-    }
-
-    // Generate lesson audio
+    // Generate only lesson audio (skip greeting for speed)
+    // Greeting can be added later if needed
     const mp3Response = await openai.audio.speech.create({
-      model: 'tts-1-hd',
+      model: 'tts-1', // Use faster model instead of tts-1-hd
       voice: voice as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
       input: text,
-      speed: 0.95
+      speed: 1.0 // Normal speed
     })
 
     const buffer = Buffer.from(await mp3Response.arrayBuffer())
@@ -76,8 +52,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       audioBase64: audioBase64,
-      greetingAudio: greetingAudio,
-      greetingText: greetingText,
+      greetingAudio: '', // Skip greeting for faster loading
+      greetingText: firstName ? `Hello, ${firstName}.` : '',
       success: true
     })
 
