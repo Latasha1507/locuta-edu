@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     // Greeting can be added later if needed
     const mp3Response = await openai.audio.speech.create({
       model: 'tts-1', // Use faster model instead of tts-1-hd
-      voice: voice as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
+      voice: voice as 'alloy',
       input: text,
       speed: 1.0 // Normal speed
     })
