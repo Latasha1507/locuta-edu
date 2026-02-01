@@ -137,7 +137,8 @@ export default function PracticePage() {
       })
       
       if (!res.ok) {
-        throw new Error(`Audio API failed: ${res.status}`)
+        const errorData = await res.json()
+        throw new Error(errorData.error || `Audio API failed: ${res.status}`)
       }
       
       const data = await res.json()
@@ -151,6 +152,7 @@ export default function PracticePage() {
     } catch (err) {
       console.error('Audio generation failed:', err)
       setIsAudioLoading(false)
+      setError('Audio generation failed. You can still read the lesson text.')
       // Don't block user - they can still read the text
     }
   }
@@ -262,7 +264,10 @@ export default function PracticePage() {
         {step === 'loading' && (
           <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
             <div className="text-5xl mb-6 animate-pulse">📚</div>
-            <h2 className="text-2xl font-bold text-purple-600">Loading Lesson...</h2>
+            <h2 className="text-2xl font-bold text-purple-600 mb-2">Loading Lesson...</h2>
+            <div className="w-48 h-2 bg-purple-200 rounded-full overflow-hidden mx-auto">
+              <div className="h-full bg-purple-600 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+            </div>
           </div>
         )}
 
