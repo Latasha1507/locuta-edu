@@ -309,7 +309,12 @@ export default function PracticePage() {
     }
   }
 
-  const formatTime = (s: number) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`
+  const formatTime = (seconds: number) => {
+    const s = Math.floor(seconds)
+    const mins = Math.floor(s / 60)
+    const secs = s % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
 
   // Simple audio controls
   const play = () => {
@@ -405,43 +410,86 @@ export default function PracticePage() {
               </div>
             )}
 
-            {introAudio && (
-              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-5 mb-6">
-                {/* Show greeting text if available */}
-                {greetingText && (
-                  <div className="mb-4 p-3 bg-white/80 rounded-lg border border-purple-200">
-                    <p className="text-sm text-purple-700 font-medium">{greetingText}</p>
-                  </div>
-                )}
-                
-                <div className="flex justify-between text-xs text-slate-600 mb-2">
-                  <span>{formatTime(currentTime)}</span>
-                  <span>{formatTime(duration)}</span>
-                </div>
-                <div className="relative w-full h-2 bg-white/60 rounded-full mb-4 cursor-pointer">
-                  <div className="absolute h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full" 
-                       style={{ width: `${duration ? (currentTime/duration)*100 : 0}%` }} />
-                  <input type="range" min={0} max={duration} value={currentTime} 
-                         onChange={e => seek(parseFloat(e.target.value))}
-                         className="absolute top-0 w-full h-full opacity-0 cursor-pointer" />
-                </div>
-                
-                <div className="flex justify-center gap-2">
-                  <button onClick={() => skipBackward()} className="w-10 h-10 rounded-full bg-white shadow hover:bg-gray-50 flex items-center justify-center" type="button">
-                    <SkipBack className="w-4 h-4" />
-                  </button>
-                  <button onClick={isPlaying ? pause : play} className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg flex items-center justify-center" type="button">
-                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
-                  </button>
-                  <button onClick={() => skipForward()} className="w-10 h-10 rounded-full bg-white shadow hover:bg-gray-50 flex items-center justify-center" type="button">
-                    <SkipForward className="w-4 h-4" />
-                  </button>
-                  <button onClick={replay} className="w-10 h-10 rounded-full bg-white shadow hover:bg-gray-50 flex items-center justify-center" type="button">
-                    <RotateCcw className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Audio Player - Clean B2C Style */}
+{introAudio && (
+  <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6 mb-6 border border-purple-200">
+    {/* Greeting Text */}
+    {greetingText && (
+      <div className="mb-4 p-3 bg-white/80 rounded-lg text-center">
+        <p className="text-sm text-purple-700 font-medium">{greetingText}</p>
+      </div>
+    )}
+    
+    {/* Time Display - Fixed Format */}
+    <div className="flex justify-between text-sm text-slate-700 mb-3 font-medium">
+      <span>{formatTime(currentTime)}</span>
+      <span>{formatTime(duration)}</span>
+    </div>
+    
+    {/* Progress Bar */}
+    <div className="relative w-full h-2 bg-white/60 rounded-full mb-6 cursor-pointer">
+      <div 
+        className="absolute h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all" 
+        style={{ width: `${duration ? (currentTime/duration)*100 : 0}%` }} 
+      />
+      <input 
+        type="range" 
+        min={0} 
+        max={Math.floor(duration)} 
+        value={Math.floor(currentTime)} 
+        onChange={e => seek(parseFloat(e.target.value))}
+        className="absolute top-0 w-full h-full opacity-0 cursor-pointer" 
+      />
+    </div>
+    
+    {/* Controls with Thumbs Up */}
+    <div className="flex justify-center items-center gap-3">
+      {/* Thumbs Up - Skip Audio */}
+      <button 
+        onClick={() => setStep('recording')}
+        className="w-12 h-12 rounded-full bg-white shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center text-slate-600 hover:text-green-600" 
+        type="button"
+        title="Got it, continue"
+      >
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+        </svg>
+      </button>
+      
+      <button 
+        onClick={skipBackward} 
+        className="w-12 h-12 rounded-full bg-white shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center text-slate-700" 
+        type="button"
+      >
+        <SkipBack className="w-5 h-5" />
+      </button>
+      
+      <button 
+        onClick={isPlaying ? pause : play} 
+        className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-xl hover:shadow-2xl hover:scale-105 transition-all flex items-center justify-center" 
+        type="button"
+      >
+        {isPlaying ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 ml-0.5" />}
+      </button>
+      
+      <button 
+        onClick={skipForward} 
+        className="w-12 h-12 rounded-full bg-white shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center text-slate-700" 
+        type="button"
+      >
+        <SkipForward className="w-5 h-5" />
+      </button>
+      
+      <button 
+        onClick={replay} 
+        className="w-12 h-12 rounded-full bg-white shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center justify-center text-slate-700" 
+        type="button"
+      >
+        <RotateCcw className="w-5 h-5" />
+      </button>
+    </div>
+  </div>
+)}
 
             <button onClick={() => setStep('recording')} 
                     className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-xl font-bold hover:shadow-xl transition-all" type="button">
