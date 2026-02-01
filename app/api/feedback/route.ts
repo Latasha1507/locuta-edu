@@ -6,13 +6,22 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-const CATEGORY_MAP: { [key: string]: string } = {
-  'public-speaking': 'Public Speaking',
+const categoryMap: { [key: string]: string } = {
+  // Middle School (Grades 5-8)
+  'public-speaking-fundamentals': 'Public Speaking Fundamentals',
   'storytelling': 'Storytelling',
-  'creator-speaking': 'Creator Speaking',
-  'casual-conversation': 'Casual Conversation',
-  'workplace-communication': 'Workplace Communication',
-  'pitch-anything': 'Pitch Anything',
+  'leadership-team-communication': 'Leadership & Team Communication',
+  'conversation-skills': 'Conversation Skills',
+  'project-academic-presentation': 'Project & Academic Presentation',
+  'persuasive-speaking': 'Persuasive Speaking',
+  
+  // High School (Grades 9-12)
+  'public-speaking-mastery': 'Public Speaking Mastery',
+  'advanced-storytelling': 'Advanced Storytelling & Content',
+  'leadership-team-advanced': 'Leadership & Team Communication (Advanced)',
+  'content-creation-digital': 'Content Creation & Digital Communication',
+  'entrepreneurial-sales': 'Entrepreneurial & Sales Communication',
+  'debate-advanced-persuasion': 'Debate & Advanced Persuasion'
 }
 
 const SCORING_WEIGHTS = {
@@ -61,7 +70,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const categoryName = CATEGORY_MAP[categoryId]
+    const categoryName = categoryMap[categoryId]
     const levelNumber = parseInt(lessonId)
 
     // Get lesson
