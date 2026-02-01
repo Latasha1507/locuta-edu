@@ -50,16 +50,71 @@ export default function PracticePage() {
   const [error, setError] = useState<string | null>(null)
   const [loaderMsg, setLoaderMsg] = useState(0)
 
+  // Simple audio player state
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const timeUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const { isPlaying, currentTime, duration, play, pause, skipBackward, skipForward, replay, seek } = 
-    useSequentialAudio(greetingAudio, introAudio)
+  // Initialize audio element when audio data is available
+  useEffect(() => {
+    if (introAudio) {
+      const audio = new Audio(`data:audio/mpeg;base64,${introAudio}`)
+      audioRef.current = audio
+
+      audio.addEventListener('loadedmetadata', () => {
+        setDuration(audio.duration)
+      })
+
+      audio.addEventListener('ended', () => {
+        setIsPlaying(false)
+        setCurrentTime(0)
+      })
+
+      audio.addEventListener('error', (e) => {
+        console.error('Audio playback error:', e)
+        setError('Audio playback failed. You can still read the lesson.')
+      })
+
+      return () => {
+        audio.pause()
+        audio.src = ''
+      }
+    }
+  }, [introAudio])
+
+  // Update current time while playing
+  useEffect(() => {
+    if (isPlaying && audioRef.current) {
+      timeUpdateIntervalRef.current = setInterval(() => {
+        if (audioRef.current) {
+          setCurrentTime(audioRef.current.currentTime)
+        }
+      }, 100)
+    } else {
+      if (timeUpdateIntervalRef.current) {
+        clearInterval(timeUpdateIntervalRef.current)
+      }
+    }
+
+    return () => {
+      if (timeUpdateIntervalRef.current) {
+        clearInterval(timeUpdateIntervalRef.current)
+      }
+    }
+  }, [isPlaying])
 
   useEffect(() => {
     loadLesson()
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+      if (timeUpdateIntervalRef.current) clearInterval(timeUpdateIntervalRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -111,8 +166,10 @@ export default function PracticePage() {
         isFirstLesson: false
       })
       
-      // Generate audio AFTER setting lesson data
-      await generateAudio(data.lesson_explanation)
+      // Generate audio AFTER setting lesson data (but don't block on it)
+      generateAudio(data.lesson_explanation).catch(err => {
+        console.error('Audio generation failed (non-blocking):', err)
+      })
       setStep('intro')
       
     } catch (err) {
@@ -152,7 +209,14 @@ export default function PracticePage() {
     } catch (err) {
       console.error('Audio generation failed:', err)
       setIsAudioLoading(false)
-      setError('Audio generation failed. You can still read the lesson text.')
+      
+      // Check if it's a quota error
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      if (errorMessage.includes('quota') || errorMessage.includes('429')) {
+        setError('Audio temporarily unavailable. You can still read and practice!')
+      } else {
+        setError('Audio generation failed. You can still read the lesson text.')
+      }
       // Don't block user - they can still read the text
     }
   }
@@ -242,6 +306,51 @@ export default function PracticePage() {
   }
 
   const formatTime = (s: number) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`
+
+  // Simple audio controls
+  const play = () => {
+    if (audioRef.current) {
+      audioRef.current.play()
+      setIsPlaying(true)
+    }
+  }
+
+  const pause = () => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+    }
+  }
+
+  const skipBackward = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10)
+      setCurrentTime(audioRef.current.currentTime)
+    }
+  }
+
+  const skipForward = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = Math.min(duration, audioRef.current.currentTime + 10)
+      setCurrentTime(audioRef.current.currentTime)
+    }
+  }
+
+  const replay = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0
+      setCurrentTime(0)
+      audioRef.current.play()
+      setIsPlaying(true)
+    }
+  }
+
+  const seek = (time: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = time
+      setCurrentTime(time)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
