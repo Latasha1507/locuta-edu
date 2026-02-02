@@ -1,3 +1,4 @@
+// components/AchievementBadge.tsx
 'use client'
 
 export default function AchievementBadge({ score }: { score: number }) {
