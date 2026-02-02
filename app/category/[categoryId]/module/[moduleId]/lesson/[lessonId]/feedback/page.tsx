@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server-admin'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
@@ -38,13 +39,14 @@ export default async function FeedbackPage({
       </div>
     )
   }
-
-  // Try to fetch the session
-  const { data: session, error: sessionError } = await supabase
+  
+  // USE ADMIN CLIENT - bypasses RLS but we still verify ownership
+  const adminClient = createAdminClient()
+  const { data: session, error: sessionError } = await adminClient
     .from('sessions')
     .select('*')
     .eq('id', sessionId)
-    .eq('user_id', user.id)
+    .eq('user_id', user.id)  // CRITICAL: Still verify the session belongs to this user
     .single()
 
   // If session not found or error, show friendly message
