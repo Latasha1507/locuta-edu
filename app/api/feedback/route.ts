@@ -248,34 +248,46 @@ Be encouraging but honest.`
     feedback.passed = feedback.overall_score >= passThreshold
 
     // Step 5: Save session
-    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-    const { error: insertError } = await supabase
-      .from('sessions')
-      .insert({
-        id: sessionId,
-        user_id: user.id,
-        category: categoryName,
-        module_number: parseInt(moduleId),
-        level_number: levelNumber,
-        tone: 'Supportive',
-        user_transcript: userTranscript,
-        ai_example_text: aiExampleText,
-        ai_example_audio: aiAudioBase64,
-        feedback: feedback,
-        overall_score: feedback.overall_score,
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      })
+console.log('💾 Attempting to save session:', {
+  sessionId,
+  userId: user.id,
+  category: categoryName,
+  moduleNumber: parseInt(moduleId),
+  levelNumber: levelNumber,
+  hasAudio: !!aiAudioBase64,
+  hasFeedback: !!feedback
+})
 
-    if (insertError) {
-      return NextResponse.json({ 
-        error: 'Failed to save session', 
-        details: insertError.message 
-      }, { status: 500 })
-    }
+const { error: insertError } = await supabase
+  .from('sessions')
+  .insert({
+    id: sessionId,
+    user_id: user.id,
+    category: categoryName,
+    module_number: parseInt(moduleId),
+    level_number: levelNumber,
+    tone: 'Supportive',
+    user_transcript: userTranscript,
+    ai_example_text: aiExampleText,
+    ai_example_audio: aiAudioBase64,
+    feedback: feedback,
+    overall_score: feedback.overall_score,
+    status: 'completed',
+    completed_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+  })
 
+if (insertError) {
+  console.error('❌ Session insert failed:', insertError)
+  return NextResponse.json({ 
+    error: 'Failed to save session', 
+    details: insertError.message 
+  }, { status: 500 })
+} else {
+  console.log('✅ Session saved successfully!')
+}
     // Step 6: Update progress
     const { data: existingProgress } = await supabase
       .from('user_progress')

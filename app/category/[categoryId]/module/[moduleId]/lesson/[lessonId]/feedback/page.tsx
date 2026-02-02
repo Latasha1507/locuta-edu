@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect, notFound } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
 export default async function FeedbackPage({
@@ -17,17 +17,61 @@ export default async function FeedbackPage({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) redirect('/auth/login')
-  if (!sessionId) notFound()
+  // If no user, redirect to login
+  if (!user) {
+    redirect('/auth/login')
+  }
 
-  const { data: session } = await supabase
+  // If no session ID, show error instead of 404
+  if (!sessionId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-tr from-[#edf2f7] to-[#f7f9fb] flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+          <div className="text-6xl mb-4">❌</div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Session Not Found</h2>
+          <p className="text-slate-600 mb-6">No feedback session was provided.</p>
+          <Link href={`/category/${categoryId}`} 
+                className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold hover:shadow-xl transition-all">
+            Back to Lessons
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  // Try to fetch the session
+  const { data: session, error: sessionError } = await supabase
     .from('sessions')
     .select('*')
     .eq('id', sessionId)
     .eq('user_id', user.id)
     .single()
 
-  if (!session) notFound()
+  // If session not found or error, show friendly message
+  if (!session || sessionError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-tr from-[#edf2f7] to-[#f7f9fb] flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Feedback Not Available</h2>
+          <p className="text-slate-600 mb-2">We couldn't find your feedback session.</p>
+          {sessionError && (
+            <p className="text-sm text-red-600 mb-4">Error: {sessionError.message}</p>
+          )}
+          <p className="text-sm text-slate-500 mb-6">
+            This might happen if:
+            <br />• The session expired
+            <br />• There was a database error
+            <br />• The recording wasn't processed
+          </p>
+          <Link href={`/category/${categoryId}/module/${moduleId}/lesson/${lessonId}/practice`} 
+                className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold hover:shadow-xl transition-all">
+            Try Recording Again
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   const feedback = session.feedback
   const score = feedback?.overall_score || 0
@@ -327,16 +371,16 @@ export default async function FeedbackPage({
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-      <Link href={`/category/${categoryId}/module/${moduleId}/lesson/${lessonId}/practice?skipTask=true`}
-            className="px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-xl transition-all hover:scale-105 text-center">
-        🎤 Practice Again
-      </Link>
-      <Link href={`/category/${categoryId}`}
-            className="px-6 sm:px-8 py-3 sm:py-4 border-2 border-purple-600 text-purple-600 hover:bg-purple-50 rounded-xl font-bold transition-colors text-center">
-        ← Back to Lessons
-      </Link>
+          <Link href={`/category/${categoryId}/module/${moduleId}/lesson/${lessonId}/practice`}
+                className="px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-xl transition-all hover:scale-105 text-center">
+            🎤 Practice Again
+          </Link>
+          <Link href={`/category/${categoryId}`}
+                className="px-6 sm:px-8 py-3 sm:py-4 border-2 border-purple-600 text-purple-600 hover:bg-purple-50 rounded-xl font-bold transition-colors text-center">
+            ← Back to Lessons
+          </Link>
+        </div>
+      </main>
     </div>
-  </main>
-</div>
   )
 }
