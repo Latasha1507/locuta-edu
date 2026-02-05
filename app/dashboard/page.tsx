@@ -4,10 +4,24 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+
+// Existing components
 import LevelProgressRing from '@/components/LevelProgressRing'
 import DailyChallengeCard from '@/components/DailyChallengeCard'
 import AchievementPopup, { ACHIEVEMENTS } from '@/components/AchievementPopup'
 import AchievementBadge from '@/components/AchievementBadge'
+
+// NEW Gamification components
+import RankBadge from '@/components/gamification/RankBadge'
+import RankProgressBar from '@/components/gamification/RankProgressBar'
+import DailyQuestsPanel from '@/components/gamification/DailyQuestsPanel'
+import PowerUpInventory from '@/components/gamification/PowerUpInventory'
+import WeeklyEventBanner from '@/components/gamification/WeeklyEventBanner'
+import LeaderboardWidget from '@/components/gamification/LeaderboardWidget'
+import ArtifactGallery from '@/components/gamification/ArtifactGallery'
+import ProgressMap from '@/components/gamification/ProgressMap'
+import LevelUpAnimation from '@/components/gamification/LevelUpAnimation'
+import XPGainNotification from '@/components/gamification/XPGainNotification'
 
 // Admin Dashboard Component
 function AdminDashboard({ user }: { user: any }) {
@@ -125,13 +139,16 @@ function AdminDashboard({ user }: { user: any }) {
   )
 }
 
-// Enhanced Student Dashboard Component
+// Enhanced Student Dashboard Component with FULL GAMIFICATION
 function StudentDashboard({ user, grade }: { user: any, grade: number | null }) {
   const [progress, setProgress] = useState<any[]>([])
   const [lessons, setLessons] = useState<any[]>([])
   const [allSessions, setAllSessions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showAchievement, setShowAchievement] = useState<keyof typeof ACHIEVEMENTS | null>(null)
+  const [showLevelUp, setShowLevelUp] = useState(false)
+  const [levelUpData, setLevelUpData] = useState<{ oldLevel: number; newLevel: number; totalXP: number } | null>(null)
+  const [xpGain, setXpGain] = useState<{ amount: number; reason: string } | null>(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -307,8 +324,40 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
     ? Math.max(...todaysSessions.map(s => s.overall_score || 0))
     : 0
 
+  // User progress data for quests
+  const userProgressData = {
+    completedCategories: categories.filter(c => {
+      const catStats = categoryStats.find(cs => cs.id === c.id)
+      return catStats && catStats.completionPercentage === 100
+    }).map(c => c.dbName),
+    weakCategories: categoryStats.filter(c => c.bestScore < 70).map(c => c.dbName),
+    recentCategories: allSessions.slice(0, 5).map(s => s.category),
+    currentStreak,
+    averageScore: avgScore,
+    totalLessons: totalCompleted
+  }
+
   return (
     <div className="space-y-6">
+      {/* XP Gain Notification */}
+      {xpGain && (
+        <XPGainNotification 
+          xpAmount={xpGain.amount}
+          reason={xpGain.reason}
+          onComplete={() => setXpGain(null)}
+        />
+      )}
+      
+      {/* Level Up Animation */}
+      {showLevelUp && levelUpData && (
+        <LevelUpAnimation
+          oldLevel={levelUpData.oldLevel}
+          newLevel={levelUpData.newLevel}
+          totalXP={levelUpData.totalXP}
+          onClose={() => setShowLevelUp(false)}
+        />
+      )}
+      
       {/* Achievement Popup */}
       {showAchievement && (
         <AchievementPopup 
@@ -317,7 +366,7 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
         />
       )}
       
-      {/* Hero Section - Level & Welcome */}
+      {/* Hero Section - Level, Rank & Welcome */}
       <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 rounded-2xl p-8 text-white shadow-xl">
         <div className="flex items-center justify-between flex-wrap gap-6">
           <div className="flex items-center gap-6">
@@ -327,6 +376,9 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
               xpInCurrentLevel={xpInCurrentLevel}
               totalXP={totalXP}
             />
+            
+            {/* Rank Badge */}
+            <RankBadge level={level} size="lg" showDescription={false} />
             
             {/* Welcome Text */}
             <div>
@@ -365,74 +417,43 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
         </div>
       </div>
 
-      {/* XP Progress Bar */}
-      <div className="bg-white rounded-xl p-5 shadow-lg border border-slate-200">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">⚡</span>
-            <div>
-              <div className="font-bold text-slate-900">Level {level} Progress</div>
-              <div className="text-sm text-slate-600">{xpInCurrentLevel}/100 XP to Level {level + 1}</div>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-slate-500">Total XP</div>
-            <div className="text-lg font-bold text-purple-600">{totalXP}</div>
-          </div>
-        </div>
-        <div className="relative w-full h-4 bg-slate-200 rounded-full overflow-hidden">
-          <div 
-            className="absolute h-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 rounded-full transition-all duration-1000 ease-out"
-            style={{ width: `${xpInCurrentLevel}%` }}
-          >
-            <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-          </div>
-        </div>
+      {/* Rank Progress Bar */}
+      <RankProgressBar level={level} totalXP={totalXP} />
+
+      {/* Daily Quests & Challenges Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <DailyChallengeCard 
+          userId={user.id}
+          todaysSessions={todaysSessions.length}
+          todaysHighScore={todaysHighScore}
+          hasStreak={currentStreak > 0}
+        />
+        <DailyQuestsPanel 
+          userId={user.id}
+          grade={grade || 5}
+          userProgress={userProgressData}
+        />
       </div>
 
-      {/* Daily Challenges & Stats */}
+      {/* Power-Ups, Events & Leaderboard */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <DailyChallengeCard 
-            userId={user.id}
-            todaysSessions={todaysSessions.length}
-            todaysHighScore={todaysHighScore}
-            hasStreak={currentStreak > 0}
-          />
+          <PowerUpInventory userId={user.id} />
         </div>
-        
-        <div className="space-y-4">
-          <div className="bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl p-5 text-white shadow-lg">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">🏆</div>
-              <div>
-                <div className="text-sm font-medium text-white/80">Best Score</div>
-                <div className="text-3xl font-bold">{bestScore || '-'}</div>
-              </div>
-            </div>
-            {bestScore >= 90 && (
-              <div className="mt-2 pt-2 border-t border-white/20">
-                <AchievementBadge score={bestScore} />
-              </div>
-            )}
-          </div>
-          
-          <div className="bg-gradient-to-br from-orange-400 to-red-500 rounded-xl p-5 text-white shadow-lg">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">🔥</div>
-              <div>
-                <div className="text-sm font-medium text-white/80">Streak</div>
-                <div className="text-3xl font-bold">{currentStreak} days</div>
-              </div>
-            </div>
-            {currentStreak >= 7 && (
-              <div className="mt-3 bg-white/20 backdrop-blur-sm rounded-lg p-2 text-center text-xs font-bold">
-                🔥 You're on fire!
-              </div>
-            )}
-          </div>
-        </div>
+        <WeeklyEventBanner />
       </div>
+
+      <LeaderboardWidget userId={user.id} type="weekly_class" limit={5} />
+
+      {/* Progress Map */}
+      <ProgressMap 
+        userId={user.id}
+        grade={grade || 5}
+        categories={categoryStats}
+      />
+
+      {/* Artifact Gallery */}
+      <ArtifactGallery userId={user.id} />
 
       {/* Categories */}
       <div>
@@ -524,7 +545,8 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
 
 // Main Dashboard Component
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState
+  <any>(null)
   const [loading, setLoading] = useState(true)
   const [isUserAdmin, setIsUserAdmin] = useState(false)
   const [grade, setGrade] = useState<number | null>(null)

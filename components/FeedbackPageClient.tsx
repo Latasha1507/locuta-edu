@@ -1,23 +1,36 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { trackFeedbackViewed } from '@/lib/analytics/helpers';
-import Mixpanel from '@/lib/mixpanel';
-import { EVENTS } from '@/lib/analytics/events';
-import { createClient } from '@/lib/supabase/client';
-import RatingNudgeModal from '@/components/RatingNudgeModal';
-import { useRatingNudge, markRatingShown } from '@/lib/hooks/useRatingNudge';
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { trackFeedbackViewed } from '@/lib/analytics/helpers'
+import Mixpanel from '@/lib/mixpanel'
+import { EVENTS } from '@/lib/analytics/events'
+import RatingNudgeModal from '@/components/RatingNudgeModal'
+import { useRatingNudge, markRatingShown } from '@/lib/hooks/useRatingNudge'
+
+// Gamification components
+import XPGainNotification from '@/components/gamification/XPGainNotification'
+import LevelUpAnimation from '@/components/gamification/LevelUpAnimation'
+import AchievementPopup, { ACHIEVEMENTS } from '@/components/AchievementPopup'
+
+// Gamification utilities
+import { calculateLessonXP } from '@/lib/gamification/calculations'
+import { awardXP, unlockAchievement, checkPowerupRewards } from '@/lib/gamification/rewards'
+import { checkQuestCompletion } from '@/lib/gamification/questGenerator'
 
 interface FeedbackPageClientProps {
-  categoryId: string;
-  moduleId: string;
-  lessonId: string;
-  sessionId: string;
-  session: any;
-  feedback: any;
-  score: number;
-  userId: string;
+  categoryId: string
+  moduleId: string
+  lessonId: string
+  sessionId: string
+  session: any
+  feedback: any
+  score: number
+  userId: string
+  passed?: boolean
+  passThreshold?: number
 }
 
 export default function FeedbackPageClient({
@@ -28,34 +41,44 @@ export default function FeedbackPageClient({
   session,
   feedback,
   score,
-  userId 
+  userId,
+  passed = false,
+  passThreshold = 60
 }: FeedbackPageClientProps) {
-  const [hasTrackedView, setHasTrackedView] = useState(false);
-  const [attemptCount, setAttemptCount] = useState(1);
-  const [showRatingModal, setShowRatingModal] = useState(false);
+  const router = useRouter()
+  const [hasTrackedView, setHasTrackedView] = useState(false)
+  const [attemptCount, setAttemptCount] = useState(1)
+  const [showRatingModal, setShowRatingModal] = useState(false)
+
+  // Gamification state
+  const [xpGain, setXpGain] = useState<{ amount: number; reason: string } | null>(null)
+  const [showLevelUp, setShowLevelUp] = useState(false)
+  const [levelUpData, setLevelUpData] = useState<{ oldLevel: number; newLevel: number; totalXP: number } | null>(null)
+  const [showAchievement, setShowAchievement] = useState<keyof typeof ACHIEVEMENTS | null>(null)
+  const [processing, setProcessing] = useState(true)
 
   // Rating nudge logic
-  const { shouldShow, isFirstClear } = useRatingNudge(score, lessonId, userId);
+  const { shouldShow, isFirstClear } = useRatingNudge(score, lessonId, userId)
 
   // Count previous attempts for this lesson
   useEffect(() => {
     const countAttempts = async () => {
-      const supabase = createClient();
+      const supabase = createClient()
       const { data: sessions } = await supabase
         .from('sessions')
         .select('id')
         .eq('user_id', userId)
         .eq('category', session.category)
         .eq('module_number', session.module_number)
-        .eq('level_number', session.level_number);
+        .eq('level_number', session.level_number)
       
       if (sessions) {
-        setAttemptCount(sessions.length);
+        setAttemptCount(sessions.length)
       }
-    };
+    }
     
-    countAttempts();
-  }, [userId, session]);
+    countAttempts()
+  }, [userId, session])
 
   // Track feedback viewed on mount
   useEffect(() => {
@@ -65,21 +88,137 @@ export default function FeedbackPageClient({
         overallScore: score,
         passed: feedback.pass_level || false,
         timeToView: 0
-      });
-      setHasTrackedView(true);
+      })
+      setHasTrackedView(true)
     }
-  }, [hasTrackedView, lessonId, score, feedback]);
+  }, [hasTrackedView, lessonId, score, feedback])
+
+  // Process gamification on mount
+  useEffect(() => {
+    processGamification()
+  }, [])
+
+  const processGamification = async () => {
+    try {
+      const supabase = createClient()
+
+      const xpEarned = calculateLessonXP({
+        score,
+        isFirstTimeCategory: false,
+        hasEventMultiplier: false,
+      })
+
+      setXpGain({ amount: xpEarned, reason: 'Lesson completed!' })
+
+      const xpResult = await awardXP(userId, xpEarned)
+      
+      if (xpResult.leveledUp) {
+        setTimeout(() => {
+          setLevelUpData({
+            oldLevel: xpResult.oldLevel,
+            newLevel: xpResult.newLevel,
+            totalXP: xpResult.newLevel * 100
+          })
+          setShowLevelUp(true)
+        }, 3000)
+      }
+
+      await checkQuestCompletion(userId, {
+        score,
+        category: session.category,
+        moduleNumber: session.module_number,
+        timestamp: new Date()
+      })
+
+      await checkAchievements(supabase)
+
+      if (score === 100) {
+        await checkPowerupRewards(userId, 'perfect_score')
+      }
+
+      setProcessing(false)
+    } catch (err) {
+      console.error('Error processing gamification:', err)
+      setProcessing(false)
+    }
+  }
+
+  const checkAchievements = async (supabase: any) => {
+    const { data: progress } = await supabase
+      .from('user_progress')
+      .select('completed')
+      .eq('user_id', userId)
+
+    const completedCount = progress?.filter((p: any) => p.completed).length || 0
+
+    const achievements: (keyof typeof ACHIEVEMENTS)[] = []
+    
+    if (completedCount === 1) achievements.push('FIRST_LESSON')
+    else if (completedCount === 5) achievements.push('FIVE_LESSONS')
+    else if (completedCount === 10) achievements.push('TEN_LESSONS')
+    else if (completedCount === 20) achievements.push('TWENTY_LESSONS')
+    
+    if (score === 100) achievements.push('PERFECT_SCORE')
+
+    if (achievements.length > 0) {
+      const achievementKey = achievements[0]
+      const achievementData = ACHIEVEMENTS[achievementKey]
+      
+      const checkAchievements = async (supabase: any) => {
+        const { data: progress } = await supabase
+          .from('user_progress')
+          .select('completed')
+          .eq('user_id', userId)
+      
+        const completedCount = progress?.filter((p: any) => p.completed).length || 0
+      
+        const achievements: (keyof typeof ACHIEVEMENTS)[] = []
+        
+        if (completedCount === 1) achievements.push('FIRST_LESSON')
+        else if (completedCount === 5) achievements.push('FIVE_LESSONS')
+        else if (completedCount === 10) achievements.push('TEN_LESSONS')
+        else if (completedCount === 20) achievements.push('TWENTY_LESSONS')
+        
+        if (score === 100) achievements.push('PERFECT_SCORE')
+      
+        if (achievements.length > 0) {
+          const achievementKey = achievements[0]
+          
+          // Determine tier based on achievement
+          const tierMap: { [key: string]: 'bronze' | 'silver' | 'gold' | 'platinum' } = {
+            'FIRST_LESSON': 'bronze',
+            'FIVE_LESSONS': 'bronze',
+            'TEN_LESSONS': 'silver',
+            'TWENTY_LESSONS': 'gold',
+            'PERFECT_SCORE': 'platinum'
+          }
+          
+          const tier = tierMap[achievementKey] || 'bronze'
+          
+          await unlockAchievement(userId, achievementKey, tier)
+          
+          setTimeout(() => {
+            setShowAchievement(achievementKey)
+          }, showLevelUp ? 8000 : 5000)
+        }
+      }
+      
+      setTimeout(() => {
+        setShowAchievement(achievementKey)
+      }, showLevelUp ? 8000 : 5000)
+    }
+  }
 
   // Show rating modal after 2 seconds
   useEffect(() => {
     if (shouldShow) {
       const timer = setTimeout(() => {
-        setShowRatingModal(true);
-      }, 2000); // 2 second delay so user sees their score first
+        setShowRatingModal(true)
+      }, 2000)
 
-      return () => clearTimeout(timer);
+      return () => clearTimeout(timer)
     }
-  }, [shouldShow]);
+  }, [shouldShow])
 
   // Track AI example played
   const handleAudioPlay = () => {
@@ -87,8 +226,8 @@ export default function FeedbackPageClient({
       lesson_id: lessonId,
       coaching_style: session.tone,
       session_id: sessionId
-    });
-  };
+    })
+  }
 
   // Track retry with attempt count
   const handleRetryClick = () => {
@@ -102,10 +241,10 @@ export default function FeedbackPageClient({
       attempt_number: attemptCount,
       reason: score >= 80 ? 'want_better_score' : 'failed',
       score_difference_from_passing: 80 - score
-    });
+    })
     
-    Mixpanel.people.increment('Total Lesson Retries', 1);
-  };
+    Mixpanel.people.increment('Total Lesson Retries', 1)
+  }
 
   // Track back to lessons
   const handleBackClick = () => {
@@ -115,21 +254,65 @@ export default function FeedbackPageClient({
       final_score: score,
       attempt_number: attemptCount,
       passed: feedback.pass_level || false
-    });
-  };
+    })
+  }
+
+  const scoreColor = passed ? 'from-green-500 to-emerald-600' : 'from-orange-500 to-red-600'
 
   return (
     <>
+      {/* Gamification Overlays */}
+      {xpGain && (
+        <XPGainNotification 
+          xpAmount={xpGain.amount}
+          reason={xpGain.reason}
+          onComplete={() => setXpGain(null)}
+        />
+      )}
+
+      {showLevelUp && levelUpData && (
+        <LevelUpAnimation
+          oldLevel={levelUpData.oldLevel}
+          newLevel={levelUpData.newLevel}
+          totalXP={levelUpData.totalXP}
+          onClose={() => setShowLevelUp(false)}
+        />
+      )}
+
+      {showAchievement && (
+        <AchievementPopup 
+          achievement={showAchievement} 
+          onClose={() => setShowAchievement(null)} 
+        />
+      )}
+
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         
         {/* Score Card */}
         <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden mb-8">
-          <div className="bg-gradient-to-r from-purple-500 to-indigo-600 px-8 py-12 text-white text-center">
+          <div className={`bg-gradient-to-r ${scoreColor} px-8 py-12 text-white text-center`}>
             <div className="text-8xl font-bold mb-4">{score}</div>
-            <div className="text-2xl font-semibold">Overall Score</div>
+            <div className="text-2xl font-semibold">
+              {passed ? '🎉 Great Job!' : `Need ${passThreshold}+ to Pass`}
+            </div>
             <p className="text-white/90 mt-2">
               {score >= 90 ? 'Excellent!' : score >= 75 ? 'Great job!' : score >= 60 ? 'Good effort!' : 'Keep practicing!'}
             </p>
+            
+            {/* XP Earned Banner */}
+            {!processing && (
+              <div className="mt-6 bg-white/20 backdrop-blur-sm rounded-xl p-4 inline-block">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">⚡</span>
+                  <div className="text-left">
+                    <div className="text-sm text-white/80">XP Earned</div>
+                    <div className="text-2xl font-bold">
+                      +{calculateLessonXP({ score, isFirstTimeCategory: false, hasEventMultiplier: false })} XP
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Focus Area Scores */}
@@ -137,9 +320,9 @@ export default function FeedbackPageClient({
             <div className="p-8 bg-gray-50">
               <h3 className="font-bold text-xl text-gray-900 mb-6">Focus Area Breakdown</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {Object.entries(feedback.focus_area_scores).map(([area, score]: [string, any]) => (
+                {Object.entries(feedback.focus_area_scores).map(([area, areaScore]: [string, any]) => (
                   <div key={area} className="bg-white rounded-xl p-4 border border-gray-200">
-                    <div className="text-3xl font-bold text-purple-600 mb-2">{score}</div>
+                    <div className="text-3xl font-bold text-purple-600 mb-2">{areaScore}</div>
                     <div className="text-sm font-medium text-gray-700">{area}</div>
                   </div>
                 ))}
@@ -201,48 +384,51 @@ export default function FeedbackPageClient({
         </div>
 
         {/* AI Example */}
-        <div className="bg-white rounded-3xl shadow-xl border border-gray-200 overflow-hidden mb-8">
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-8 py-6 text-white">
-            <h2 className="text-2xl font-bold">
-              How I Would Have Done It
-            </h2>
-            <p className="text-white/90 mt-1">Listen to an example response</p>
-          </div>
-          
-          <div className="p-8">
-            {/* Audio Player with tracking */}
-            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6 border-2 border-purple-200 mb-6">
-              <audio
-                controls
-                className="w-full"
-                src={`data:audio/mpeg;base64,${session.ai_example_audio}`}
-                onPlay={handleAudioPlay}
-              >
-                Your browser does not support audio playback.
-              </audio>
+        {session.ai_example_audio && session.ai_example_text && (
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-200 overflow-hidden mb-8">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-8 py-6 text-white">
+              <h2 className="text-2xl font-bold">
+                How I Would Have Done It
+              </h2>
+              <p className="text-white/90 mt-1">Listen to an example response</p>
             </div>
+            
+            <div className="p-8">
+              {/* Audio Player with tracking */}
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6 border-2 border-purple-200 mb-6">
+                <audio
+                  controls
+                  className="w-full"
+                  src={`data:audio/mpeg;base64,${session.ai_example_audio}`}
+                  onPlay={handleAudioPlay}
+                  preload="metadata"
+                >
+                  Your browser does not support audio playback.
+                </audio>
+              </div>
 
-            {/* Transcript */}
-            <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-              <h3 className="font-semibold text-gray-900 mb-3">Transcript:</h3>
-              <p className="text-gray-700 leading-relaxed">
-                {session.ai_example_text}
-              </p>
+              {/* Transcript */}
+              <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                <h3 className="font-semibold text-gray-900 mb-3">Transcript:</h3>
+                <p className="text-gray-700 leading-relaxed">
+                  {session.ai_example_text}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Action Buttons with tracking */}
         <div className="flex gap-4 justify-center">
           <Link
-            href={`/category/${categoryId}/module/${moduleId}/lesson/${lessonId}/practice?tone=${session.tone}`}
+            href={`/category/${categoryId}/module/${moduleId}/lesson/${lessonId}/practice`}
             onClick={handleRetryClick}
             className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-xl transition-transform hover:scale-105"
           >
-            Practice Again
+            🎤 Practice Again
           </Link>
           <Link
-            href={`/category/${categoryId}/modules?tone=${session.tone}`}
+            href={`/category/${categoryId}`}
             onClick={handleBackClick}
             className="px-8 py-4 border-2 border-purple-600 text-purple-600 hover:bg-purple-50 rounded-xl font-bold transition-colors"
           >
@@ -259,11 +445,11 @@ export default function FeedbackPageClient({
           category={categoryId}
           isFirstClear={isFirstClear}
           onClose={async () => {
-            await markRatingShown(userId);
-            setShowRatingModal(false);
+            await markRatingShown(userId)
+            setShowRatingModal(false)
           }}
         />
       )}
     </>
-  );
+  )
 }

@@ -1,90 +1,176 @@
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/server-admin'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
-export default async function FeedbackPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ categoryId: string; moduleId: string; lessonId: string }>
-  searchParams: Promise<{ session?: string }>
-}) {
-  const resolvedParams = await params
-  const resolvedSearchParams = await searchParams
-  const { categoryId, moduleId, lessonId } = resolvedParams
-  const sessionId = resolvedSearchParams.session
+// Gamification components
+import XPGainNotification from '@/components/gamification/XPGainNotification'
+import LevelUpAnimation from '@/components/gamification/LevelUpAnimation'
+import AchievementPopup, { ACHIEVEMENTS } from '@/components/AchievementPopup'
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+// Gamification utilities
+import { calculateLessonXP, calculateLevel } from '@/lib/gamification/calculations'
+import { awardXP, unlockAchievement, checkPowerupRewards } from '@/lib/gamification/rewards'
+import { checkQuestCompletion } from '@/lib/gamification/questGenerator'
 
-  // If no user, redirect to login
-  if (!user) {
-    redirect('/auth/login')
+interface FeedbackPageClientProps {
+  categoryId: string
+  moduleId: string
+  lessonId: string
+  sessionId: string 
+  session: any
+  feedback: any
+  score: number
+  userId: string
+  passed?: boolean        
+  passThreshold?: number  
+}
+
+export default function FeedbackPageClient({
+  categoryId,
+  moduleId,
+  lessonId,
+  session,
+  feedback,
+  score,
+  passed,
+  passThreshold,
+  userId
+}: FeedbackPageClientProps) {
+  const router = useRouter()
+  const [xpGain, setXpGain] = useState<{ amount: number; reason: string } | null>(null)
+  const [showLevelUp, setShowLevelUp] = useState(false)
+  const [levelUpData, setLevelUpData] = useState<{ oldLevel: number; newLevel: number; totalXP: number } | null>(null)
+  const [showAchievement, setShowAchievement] = useState<keyof typeof ACHIEVEMENTS | null>(null)
+  const [processing, setProcessing] = useState(true)
+
+  useEffect(() => {
+    processGamification()
+  }, [])
+
+  const processGamification = async () => {
+    try {
+      const supabase = createClient()
+
+      // 1. Calculate XP earned
+      const xpEarned = calculateLessonXP({
+        score,
+        isFirstTimeCategory: false, // TODO: Check if first time in category
+        hasEventMultiplier: false, // TODO: Check for active events
+      })
+
+      // Show XP notification
+      setXpGain({ amount: xpEarned, reason: 'Lesson completed!' })
+
+      // 2. Award XP and check for level up
+      const xpResult = await awardXP(userId, xpEarned)
+      
+      if (xpResult.leveledUp) {
+        // Show level up animation after XP notification
+        setTimeout(() => {
+          setLevelUpData({
+            oldLevel: xpResult.oldLevel,
+            newLevel: xpResult.newLevel,
+            totalXP: 0 // Will be calculated in component
+          })
+          setShowLevelUp(true)
+        }, 3000)
+      }
+
+      // 3. Check for quest completion
+      await checkQuestCompletion(userId, {
+        score,
+        category: session.category,
+        moduleNumber: session.module_number,
+        timestamp: new Date()
+      })
+
+      // 4. Check for achievements
+      await checkAchievements(supabase)
+
+      // 5. Award power-ups for perfect score
+      if (score === 100) {
+        await checkPowerupRewards(userId, 'perfect_score')
+      }
+
+      setProcessing(false)
+    } catch (err) {
+      console.error('Error processing gamification:', err)
+      setProcessing(false)
+    }
   }
 
-  // If no session ID, show error instead of 404
-  if (!sessionId) {
-    return (
-      <div className="min-h-screen bg-gradient-to-tr from-[#edf2f7] to-[#f7f9fb] flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
-          <div className="text-6xl mb-4">❌</div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Session Not Found</h2>
-          <p className="text-slate-600 mb-6">No feedback session was provided.</p>
-          <Link href={`/category/${categoryId}`} 
-                className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold hover:shadow-xl transition-all">
-            Back to Lessons
-          </Link>
-        </div>
-      </div>
-    )
-  }
-  
-  // USE ADMIN CLIENT - bypasses RLS but we still verify ownership
-  const adminClient = createAdminClient()
-  const { data: session, error: sessionError } = await adminClient
-    .from('sessions')
-    .select('*')
-    .eq('id', sessionId)
-    .eq('user_id', user.id)  // CRITICAL: Still verify the session belongs to this user
-    .single()
+  const checkAchievements = async (supabase: any) => {
+    // Get user's total progress
+    const { data: progress } = await supabase
+      .from('user_progress')
+      .select('completed')
+      .eq('user_id', userId)
 
-  // If session not found or error, show friendly message
-  if (!session || sessionError) {
-    return (
-      <div className="min-h-screen bg-gradient-to-tr from-[#edf2f7] to-[#f7f9fb] flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md text-center">
-          <div className="text-6xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Feedback Not Available</h2>
-          <p className="text-slate-600 mb-2">We couldn't find your feedback session.</p>
-          {sessionError && (
-            <p className="text-sm text-red-600 mb-4">Error: {sessionError.message}</p>
-          )}
-          <p className="text-sm text-slate-500 mb-6">
-            This might happen if:
-            <br />• The session expired
-            <br />• There was a database error
-            <br />• The recording wasn't processed
-          </p>
-          <Link href={`/category/${categoryId}/module/${moduleId}/lesson/${lessonId}/practice`} 
-                className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold hover:shadow-xl transition-all">
-            Try Recording Again
-          </Link>
-        </div>
-      </div>
-    )
-  }
+    const completedCount = progress?.filter((p: any) => p.completed).length || 0
 
-  const feedback = session.feedback
-  const score = feedback?.overall_score || 0
-  const moduleNumber = session.module_number || parseInt(moduleId)
-  const passThreshold = moduleNumber <= 10 ? 60 : moduleNumber <= 30 ? 65 : 70
-  const passed = feedback?.passed || score >= passThreshold
-  
+    // Check milestone achievements
+    const achievements: (keyof typeof ACHIEVEMENTS)[] = []
+    
+    if (completedCount === 1) achievements.push('FIRST_LESSON')
+    else if (completedCount === 5) achievements.push('FIVE_LESSONS')
+    else if (completedCount === 10) achievements.push('TEN_LESSONS')
+    else if (completedCount === 20) achievements.push('TWENTY_LESSONS')
+    
+    if (score === 100) achievements.push('PERFECT_SCORE')
+
+    // Unlock and show first achievement
+    if (achievements.length > 0) {
+      const achievementKey = achievements[0]
+      
+      // Determine tier based on achievement
+      const tierMap: { [key: string]: 'bronze' | 'silver' | 'gold' | 'platinum' } = {
+        'FIRST_LESSON': 'bronze',
+        'FIVE_LESSONS': 'bronze',
+        'TEN_LESSONS': 'silver',
+        'TWENTY_LESSONS': 'gold',
+        'PERFECT_SCORE': 'platinum'
+      }
+      
+      const tier = tierMap[achievementKey] || 'bronze'
+      
+      await unlockAchievement(userId, achievementKey, tier)
+      
+      setTimeout(() => {
+        setShowAchievement(achievementKey)
+      }, showLevelUp ? 8000 : 5000)
+    }
+  }
   const scoreColor = passed ? 'from-green-500 to-emerald-600' : 'from-orange-500 to-red-600'
-
   return (
     <div className="min-h-screen bg-gradient-to-tr from-[#edf2f7] to-[#f7f9fb]">
+      {/* Gamification Overlays */}
+      {xpGain && (
+        <XPGainNotification 
+          xpAmount={xpGain.amount}
+          reason={xpGain.reason}
+          onComplete={() => setXpGain(null)}
+        />
+      )}
+
+      {showLevelUp && levelUpData && (
+        <LevelUpAnimation
+          oldLevel={levelUpData.oldLevel}
+          newLevel={levelUpData.newLevel}
+          totalXP={levelUpData.oldLevel * 100} // Placeholder
+          onClose={() => setShowLevelUp(false)}
+        />
+      )}
+
+      {showAchievement && (
+        <AchievementPopup 
+          achievement={showAchievement} 
+          onClose={() => setShowAchievement(null)} 
+        />
+      )}
+
       {/* Header */}
       <header className="bg-white/70 backdrop-blur-xl border-b border-slate-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
@@ -114,6 +200,19 @@ export default async function FeedbackPage({
             <p className="text-lg text-white/90">
               {passed ? "You're making excellent progress!" : "Keep practicing - you're improving!"}
             </p>
+            
+            {/* XP Earned Banner */}
+            {!processing && (
+              <div className="mt-6 bg-white/20 backdrop-blur-sm rounded-xl p-4 inline-block">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">⚡</span>
+                  <div className="text-left">
+                    <div className="text-sm text-white/80">XP Earned</div>
+                    <div className="text-2xl font-bold">+{calculateLessonXP({ score, isFirstTimeCategory: false, hasEventMultiplier: false })} XP</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Focus Area Scores */}
