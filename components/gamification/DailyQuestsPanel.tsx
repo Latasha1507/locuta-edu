@@ -43,13 +43,13 @@ export default function DailyQuestsPanel({
         .select('*')
         .eq('user_id', userId)
         .eq('date', today)
-
+  
       if (existingQuests && existingQuests.length > 0) {
         setQuests(existingQuests)
         setCompletedToday(existingQuests.filter(q => q.completed).length)
       } else {
         // Generate new quests for today
-        const newQuests = generateDailyQuests(userProgress, grade)
+        const newQuests = await generateDailyQuests(userId, grade, userProgress as any)
         
         // Save to database
         const questsToInsert = newQuests.map(quest => ({
@@ -60,15 +60,16 @@ export default function DailyQuestsPanel({
           completed: false,
           xp_reward: quest.xpReward
         }))
-
+  
         const { data: insertedQuests, error } = await supabase
           .from('daily_quests')
           .insert(questsToInsert)
           .select()
-
+  
         if (!error && insertedQuests) {
           setQuests(insertedQuests)
         } else {
+          // Fallback: use generated quests without DB
           setQuests(newQuests.map(q => ({ quest_data: q, completed: false })))
         }
       }
@@ -79,7 +80,7 @@ export default function DailyQuestsPanel({
       setLoading(false)
     }
   }
-
+  
   const checkAndCompleteQuest = async (quest: any) => {
     // Check if quest should be auto-completed based on user progress
     let shouldComplete = false
