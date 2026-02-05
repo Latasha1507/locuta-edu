@@ -229,7 +229,20 @@ export default function FeedbackPageClient({
     })
   }
 
-  const scoreColor = passed ? 'from-green-500 to-emerald-600' : 'from-orange-500 to-red-600'
+  // Get tier styling
+  const getTierStyling = (tier: string) => {
+    switch(tier) {
+      case 'EXCELLENT': return 'from-yellow-400 to-amber-500'
+      case 'GOOD': return 'from-green-500 to-emerald-600'
+      case 'PASSED': return 'from-blue-500 to-cyan-600'
+      case 'NEARLY_THERE': return 'from-orange-400 to-orange-500'
+      default: return 'from-orange-500 to-red-600'
+    }
+  }
+
+  const scoreColor = feedback.performance_tier 
+    ? getTierStyling(feedback.performance_tier)
+    : (passed ? 'from-green-500 to-emerald-600' : 'from-orange-500 to-red-600')
 
   return (
     <>
@@ -260,15 +273,69 @@ export default function FeedbackPageClient({
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         
-        {/* Score Card */}
+        {/* NEW: Improvement Banner */}
+        {feedback.improvement !== undefined && feedback.improvement !== null && (
+          <div className={`mb-6 rounded-2xl p-6 ${
+            feedback.improvement > 0 ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300' :
+            feedback.improvement === 0 ? 'bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300' :
+            'bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-300'
+          }`}>
+            <div className="flex items-center gap-4">
+              <div className={`text-5xl ${
+                feedback.improvement > 0 ? 'animate-bounce' : ''
+              }`}>
+                {feedback.improvement > 0 ? '📈' : feedback.improvement === 0 ? '➡️' : '📉'}
+              </div>
+              <div className="flex-1">
+                <h3 className={`text-xl font-bold mb-1 ${
+                  feedback.improvement > 0 ? 'text-green-900' :
+                  feedback.improvement === 0 ? 'text-blue-900' :
+                  'text-orange-900'
+                }`}>
+                  {feedback.improvement > 0 && `+${feedback.improvement} Points!`}
+                  {feedback.improvement === 0 && 'Same Score'}
+                  {feedback.improvement < 0 && `${feedback.improvement} Points`}
+                </h3>
+                <p className={`${
+                  feedback.improvement > 0 ? 'text-green-700' :
+                  feedback.improvement === 0 ? 'text-blue-700' :
+                  'text-orange-700'
+                }`}>
+                  {feedback.improvement_message}
+                </p>
+                <div className="mt-2 text-sm font-medium">
+                  <span className="text-gray-600">Previous: </span>
+                  <span className="text-gray-900">{feedback.previous_score}</span>
+                  <span className="mx-2">→</span>
+                  <span className="text-gray-600">Current: </span>
+                  <span className="text-gray-900 font-bold">{score}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Score Card with Performance Tier */}
         <div className="bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden mb-8">
           <div className={`bg-gradient-to-r ${scoreColor} px-8 py-12 text-white text-center`}>
+            {/* NEW: Performance Tier Emoji */}
+            {feedback.tier_emoji && (
+              <div className="text-6xl mb-4 animate-bounce">{feedback.tier_emoji}</div>
+            )}
+            
             <div className="text-8xl font-bold mb-4">{score}</div>
-            <div className="text-2xl font-semibold">
-              {passed ? '🎉 Great Job!' : `Need ${passThreshold}+ to Pass`}
+            
+            {/* NEW: Tier Message */}
+            <div className="text-2xl font-semibold mb-2">
+              {feedback.tier_message || (passed ? '🎉 Great Job!' : `Need ${passThreshold}+ to Pass`)}
             </div>
-            <p className="text-white/90 mt-2">
-              {score >= 90 ? 'Excellent!' : score >= 75 ? 'Great job!' : score >= 60 ? 'Good effort!' : 'Keep practicing!'}
+            
+            <p className="text-white/90 mt-2 text-lg">
+              {feedback.performance_tier && (
+                <span className="bg-white/20 px-4 py-2 rounded-full font-medium">
+                  {feedback.performance_tier.replace('_', ' ')}
+                </span>
+              )}
             </p>
             
             {/* XP Earned Banner */}
@@ -302,6 +369,19 @@ export default function FeedbackPageClient({
             </div>
           )}
         </div>
+
+        {/* NEW: Adaptive Suggestion Banner */}
+        {feedback.adaptive_suggestion && (
+          <div className="mb-8 bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-2xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="text-4xl">💡</div>
+              <div>
+                <h3 className="text-lg font-bold text-indigo-900 mb-2">Personalized Suggestion</h3>
+                <p className="text-indigo-700">{feedback.adaptive_suggestion}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Detailed Feedback */}
         <div className="bg-white rounded-3xl shadow-xl border border-gray-200 p-8 mb-8">
@@ -357,6 +437,38 @@ export default function FeedbackPageClient({
               &quot;{session.user_transcript}&quot;
             </p>
           </div>
+
+          {/* Transcript Metrics with NEW Delivery Score */}
+          {feedback?.transcript_metrics && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+              <div className="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
+                <div className="text-xs text-purple-600 font-semibold mb-1">Words</div>
+                <div className="text-3xl font-bold text-purple-700">{feedback.transcript_metrics.word_count || 0}</div>
+              </div>
+              <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
+                <div className="text-xs text-blue-600 font-semibold mb-1">Speaking Pace</div>
+                <div className="text-3xl font-bold text-blue-700">{feedback.transcript_metrics.words_per_minute || 0}</div>
+                <div className="text-xs text-blue-600 mt-1">WPM</div>
+              </div>
+              <div className="bg-yellow-50 rounded-xl p-4 border-2 border-yellow-200">
+                <div className="text-xs text-yellow-600 font-semibold mb-1">Filler Words</div>
+                <div className="text-3xl font-bold text-yellow-700">{feedback.transcript_metrics.filler_words || 0}</div>
+                <div className="text-xs text-yellow-600 mt-1">
+                  {(feedback.transcript_metrics.filler_words || 0) < 3 ? '✓ Great' : 
+                   (feedback.transcript_metrics.filler_words || 0) < 6 ? '○ OK' : '⚠ High'}
+                </div>
+              </div>
+              <div className="bg-green-50 rounded-xl p-4 border-2 border-green-200">
+                <div className="text-xs text-green-600 font-semibold mb-1">Delivery</div>
+                <div className="text-3xl font-bold text-green-700">
+                  {feedback.linguistic_analysis?.delivery?.score || 'N/A'}
+                </div>
+                <div className="text-xs text-green-600 mt-1">
+                  {feedback.linguistic_analysis?.delivery?.pace_quality || 'Good'}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* AI Example */}
@@ -390,6 +502,118 @@ export default function FeedbackPageClient({
                   {session.ai_example_text}
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* NEW: Linguistic Analysis with Delivery */}
+        {feedback?.linguistic_analysis && (
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-200 p-8 mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Linguistic Analysis</h2>
+            
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Grammar */}
+              {feedback.linguistic_analysis.grammar && (
+                <div className="bg-blue-50 rounded-xl p-5 border-2 border-blue-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-lg text-blue-900">Grammar</h3>
+                    <span className="text-3xl font-bold text-blue-700">{feedback.linguistic_analysis.grammar.score}</span>
+                  </div>
+                  {feedback.linguistic_analysis.grammar.suggestions?.length > 0 && (
+                    <ul className="text-sm text-blue-800 space-y-2">
+                      {feedback.linguistic_analysis.grammar.suggestions.map((s: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-blue-600 mt-0.5">→</span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Sentence Formation */}
+              {feedback.linguistic_analysis.sentence_formation && (
+                <div className="bg-green-50 rounded-xl p-5 border-2 border-green-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-lg text-green-900">Sentence Structure</h3>
+                    <span className="text-3xl font-bold text-green-700">{feedback.linguistic_analysis.sentence_formation.score}</span>
+                  </div>
+                  <div className="text-sm text-green-800 mb-2">
+                    <strong>Level:</strong> <span className="capitalize">{feedback.linguistic_analysis.sentence_formation.complexity_level || 'intermediate'}</span>
+                  </div>
+                  {feedback.linguistic_analysis.sentence_formation.suggestions?.length > 0 && (
+                    <ul className="text-sm text-green-800 space-y-2">
+                      {feedback.linguistic_analysis.sentence_formation.suggestions.map((s: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-green-600 mt-0.5">→</span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Vocabulary */}
+              {feedback.linguistic_analysis.vocabulary && (
+                <div className="bg-purple-50 rounded-xl p-5 border-2 border-purple-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-lg text-purple-900">Vocabulary</h3>
+                    <span className="text-3xl font-bold text-purple-700">{feedback.linguistic_analysis.vocabulary.score}</span>
+                  </div>
+                  {feedback.linguistic_analysis.vocabulary.advanced_words_used?.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-sm font-semibold text-purple-800 mb-2">Strong Words Used:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {feedback.linguistic_analysis.vocabulary.advanced_words_used.map((word: string, i: number) => (
+                          <span key={i} className="bg-purple-200 text-purple-900 px-3 py-1 rounded-full text-xs font-medium">
+                            {word}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {feedback.linguistic_analysis.vocabulary.suggestions?.length > 0 && (
+                    <ul className="text-sm text-purple-800 space-y-2">
+                      {feedback.linguistic_analysis.vocabulary.suggestions.map((s: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-purple-600 mt-0.5">→</span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* NEW: Delivery Analysis */}
+              {feedback.linguistic_analysis.delivery && (
+                <div className="bg-amber-50 rounded-xl p-5 border-2 border-amber-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-lg text-amber-900">Delivery & Pace</h3>
+                    <span className="text-3xl font-bold text-amber-700">{feedback.linguistic_analysis.delivery.score}</span>
+                  </div>
+                  <div className="space-y-2 mb-3">
+                    <div className="text-sm text-amber-800">
+                      <strong>Pace:</strong> <span className="capitalize">{feedback.linguistic_analysis.delivery.pace_quality}</span>
+                    </div>
+                    <div className="text-sm text-amber-800">
+                      <strong>Filler Frequency:</strong> <span className="capitalize">{feedback.linguistic_analysis.delivery.filler_word_frequency}</span>
+                    </div>
+                  </div>
+                  {feedback.linguistic_analysis.delivery.suggestions?.length > 0 && (
+                    <ul className="text-sm text-amber-800 space-y-2">
+                      {feedback.linguistic_analysis.delivery.suggestions.map((s: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-amber-600 mt-0.5">→</span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
