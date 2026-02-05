@@ -162,46 +162,18 @@ export default function FeedbackPageClient({
 
     if (achievements.length > 0) {
       const achievementKey = achievements[0]
-      const achievementData = ACHIEVEMENTS[achievementKey]
       
-      const checkAchievements = async (supabase: any) => {
-        const { data: progress } = await supabase
-          .from('user_progress')
-          .select('completed')
-          .eq('user_id', userId)
-      
-        const completedCount = progress?.filter((p: any) => p.completed).length || 0
-      
-        const achievements: (keyof typeof ACHIEVEMENTS)[] = []
-        
-        if (completedCount === 1) achievements.push('FIRST_LESSON')
-        else if (completedCount === 5) achievements.push('FIVE_LESSONS')
-        else if (completedCount === 10) achievements.push('TEN_LESSONS')
-        else if (completedCount === 20) achievements.push('TWENTY_LESSONS')
-        
-        if (score === 100) achievements.push('PERFECT_SCORE')
-      
-        if (achievements.length > 0) {
-          const achievementKey = achievements[0]
-          
-          // Determine tier based on achievement
-          const tierMap: { [key: string]: 'bronze' | 'silver' | 'gold' | 'platinum' } = {
-            'FIRST_LESSON': 'bronze',
-            'FIVE_LESSONS': 'bronze',
-            'TEN_LESSONS': 'silver',
-            'TWENTY_LESSONS': 'gold',
-            'PERFECT_SCORE': 'platinum'
-          }
-          
-          const tier = tierMap[achievementKey] || 'bronze'
-          
-          await unlockAchievement(userId, achievementKey, tier)
-          
-          setTimeout(() => {
-            setShowAchievement(achievementKey)
-          }, showLevelUp ? 8000 : 5000)
-        }
+      const tierMap: { [key: string]: 'bronze' | 'silver' | 'gold' | 'platinum' } = {
+        'FIRST_LESSON': 'bronze',
+        'FIVE_LESSONS': 'bronze',
+        'TEN_LESSONS': 'silver',
+        'TWENTY_LESSONS': 'gold',
+        'PERFECT_SCORE': 'platinum'
       }
+      
+      const tier = tierMap[achievementKey] || 'bronze'
+      
+      await unlockAchievement(userId, achievementKey, tier)
       
       setTimeout(() => {
         setShowAchievement(achievementKey)
@@ -316,7 +288,7 @@ export default function FeedbackPageClient({
           </div>
 
           {/* Focus Area Scores */}
-          {feedback.focus_area_scores && Object.keys(feedback.focus_area_scores).length > 0 && (
+          {feedback?.focus_area_scores && Object.keys(feedback.focus_area_scores).length > 0 && (
             <div className="p-8 bg-gray-50">
               <h3 className="font-bold text-xl text-gray-900 mb-6">Focus Area Breakdown</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -340,34 +312,38 @@ export default function FeedbackPageClient({
 
           <div className="grid md:grid-cols-2 gap-6">
             {/* Strengths */}
-            <div className="bg-green-50 rounded-xl p-6 border border-green-200">
-              <h3 className="font-bold text-lg text-green-900 mb-4">
-                Strengths
-              </h3>
-              <ul className="space-y-3">
-                {feedback.strengths?.map((strength: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-green-800">
-                    <span className="text-green-600">•</span>
-                    <span>{strength}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {feedback?.strengths && feedback.strengths.length > 0 && (
+              <div className="bg-green-50 rounded-xl p-6 border border-green-200">
+                <h3 className="font-bold text-lg text-green-900 mb-4">
+                  Strengths
+                </h3>
+                <ul className="space-y-3">
+                  {feedback.strengths.map((strength: string, i: number) => (
+                    <li key={i} className="flex items-start gap-2 text-green-800">
+                      <span className="text-green-600">•</span>
+                      <span>{strength}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Improvements */}
-            <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
-              <h3 className="font-bold text-lg text-blue-900 mb-4">
-                Areas to Improve
-              </h3>
-              <ul className="space-y-3">
-                {feedback.improvements?.map((improvement: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-blue-800">
-                    <span className="text-blue-600">•</span>
-                    <span>{improvement}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {feedback?.improvements && feedback.improvements.length > 0 && (
+              <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                <h3 className="font-bold text-lg text-blue-900 mb-4">
+                  Areas to Improve
+                </h3>
+                <ul className="space-y-3">
+                  {feedback.improvements.map((improvement: string, i: number) => (
+                    <li key={i} className="flex items-start gap-2 text-blue-800">
+                      <span className="text-blue-600">•</span>
+                      <span>{improvement}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
 
