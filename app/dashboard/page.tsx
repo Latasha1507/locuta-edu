@@ -5,23 +5,10 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-// Existing components
-import LevelProgressRing from '@/components/LevelProgressRing'
-import DailyChallengeCard from '@/components/DailyChallengeCard'
-import AchievementPopup, { ACHIEVEMENTS } from '@/components/AchievementPopup'
-import AchievementBadge from '@/components/AchievementBadge'
-
-// NEW Gamification components
-import RankBadge from '@/components/gamification/RankBadge'
-import RankProgressBar from '@/components/gamification/RankProgressBar'
-import DailyQuestsPanel from '@/components/gamification/DailyQuestsPanel'
-import PowerUpInventory from '@/components/gamification/PowerUpInventory'
-import WeeklyEventBanner from '@/components/gamification/WeeklyEventBanner'
-import LeaderboardWidget from '@/components/gamification/LeaderboardWidget'
-import ArtifactGallery from '@/components/gamification/ArtifactGallery'
-import ProgressMap from '@/components/gamification/ProgressMap'
-import LevelUpAnimation from '@/components/gamification/LevelUpAnimation'
+// Gamification components - ONLY essential ones
 import XPGainNotification from '@/components/gamification/XPGainNotification'
+import LevelUpAnimation from '@/components/gamification/LevelUpAnimation'
+import AchievementPopup, { ACHIEVEMENTS } from '@/components/AchievementPopup'
 
 // Admin Dashboard Component
 function AdminDashboard({ user }: { user: any }) {
@@ -139,7 +126,7 @@ function AdminDashboard({ user }: { user: any }) {
   )
 }
 
-// Enhanced Student Dashboard Component with FULL GAMIFICATION
+// REDESIGNED Student Dashboard - Clean & Focused
 function StudentDashboard({ user, grade }: { user: any, grade: number | null }) {
   const [progress, setProgress] = useState<any[]>([])
   const [lessons, setLessons] = useState<any[]>([])
@@ -167,20 +154,12 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
             .select('id, overall_score, created_at, category, module_number, level_number')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
-            .limit(50)
+            .limit(10)
         ])
 
-        const progressData = progressResult.data || []
-        const lessonsData = lessonsResult.data || []
-        const sessionsData = sessionsResult.data || []
-
-        setProgress(progressData)
-        setLessons(lessonsData)
-        setAllSessions(sessionsData)
-        
-        // Check for new achievements
-        checkAchievements(progressData, sessionsData)
-        
+        setProgress(progressResult.data || [])
+        setLessons(lessonsResult.data || [])
+        setAllSessions(sessionsResult.data || [])
         setLoading(false)
       } catch (err) {
         console.error('Error loading data:', err)
@@ -189,60 +168,6 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
     }
     loadData()
   }, [user.id])
-
-  // Achievement checking logic
-  const checkAchievements = (progressData: any[], sessionsData: any[]) => {
-    const completedCount = progressData.filter(p => p.completed).length
-    const newAchievements: (keyof typeof ACHIEVEMENTS)[] = []
-    
-    // Check completion milestones
-    if (completedCount === 1 && !hasAchievement('FIRST_LESSON')) {
-      newAchievements.push('FIRST_LESSON')
-    } else if (completedCount === 5 && !hasAchievement('FIVE_LESSONS')) {
-      newAchievements.push('FIVE_LESSONS')
-    } else if (completedCount === 10 && !hasAchievement('TEN_LESSONS')) {
-      newAchievements.push('TEN_LESSONS')
-    } else if (completedCount === 20 && !hasAchievement('TWENTY_LESSONS')) {
-      newAchievements.push('TWENTY_LESSONS')
-    }
-    
-    // Check for perfect score
-    const hasPerfectScore = sessionsData.some(s => s.overall_score === 100)
-    if (hasPerfectScore && !hasAchievement('PERFECT_SCORE')) {
-      newAchievements.push('PERFECT_SCORE')
-    }
-    
-    // Check streak
-    const streak = calculateStreak(sessionsData)
-    if (streak === 3 && !hasAchievement('THREE_DAY_STREAK')) {
-      newAchievements.push('THREE_DAY_STREAK')
-    } else if (streak === 7 && !hasAchievement('WEEK_WARRIOR')) {
-      newAchievements.push('WEEK_WARRIOR')
-    }
-    
-    // Check for weekend practice
-    const hasWeekendPractice = sessionsData.some(s => {
-      const day = new Date(s.created_at).getDay()
-      return day === 0 || day === 6
-    })
-    if (hasWeekendPractice && !hasAchievement('WEEKEND_WARRIOR')) {
-      newAchievements.push('WEEKEND_WARRIOR')
-    }
-    
-    // Show first achievement if any
-    if (newAchievements.length > 0) {
-      setShowAchievement(newAchievements[0])
-      // Store in localStorage
-      const stored = localStorage.getItem(`achievements_${user.id}`) || '[]'
-      const existing = JSON.parse(stored)
-      localStorage.setItem(`achievements_${user.id}`, JSON.stringify([...existing, ...newAchievements]))
-    }
-  }
-  
-  const hasAchievement = (achievement: string) => {
-    const stored = localStorage.getItem(`achievements_${user.id}`) || '[]'
-    return JSON.parse(stored).includes(achievement)
-  }
 
   const calculateStreak = (sessions: any[]) => {
     if (!sessions || sessions.length === 0) return 0
@@ -295,7 +220,10 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
 
   const totalCompleted = progress?.filter((p: any) => p.completed).length || 0
   const totalAvailable = lessons?.length || 0
-  const overallPercentage = totalAvailable > 0 ? Math.round((totalCompleted / totalAvailable) * 100) : 0
+  const currentStreak = calculateStreak(allSessions)
+  const avgScore = allSessions?.length > 0 
+    ? Math.round(allSessions.reduce((sum: number, s: any) => sum + (s.overall_score || 0), 0) / allSessions.length)
+    : 0
 
   const getLevelAndXP = () => {
     const xpPerLesson = 10
@@ -305,248 +233,123 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
     return { level, xpInCurrentLevel, totalXP }
   }
 
-  const { level, xpInCurrentLevel, totalXP } = getLevelAndXP()
-  const currentStreak = calculateStreak(allSessions)
-  const avgScore = allSessions?.length > 0 
-    ? Math.round(allSessions.reduce((sum: number, s: any) => sum + (s.overall_score || 0), 0) / allSessions.length)
-    : 0
-  const bestScore = progress?.length > 0 ? Math.max(...progress.map((p: any) => p.best_score || 0)) : 0
-  
-  // Today's stats for daily challenges
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const todaysSessions = allSessions.filter(s => {
-    const sessionDate = new Date(s.created_at)
-    sessionDate.setHours(0, 0, 0, 0)
-    return sessionDate.getTime() === today.getTime()
-  })
-  const todaysHighScore = todaysSessions.length > 0 
-    ? Math.max(...todaysSessions.map(s => s.overall_score || 0))
-    : 0
-
-  // User progress data for quests
-  const userProgressData = {
-    completedCategories: categories.filter(c => {
-      const catStats = categoryStats.find(cs => cs.id === c.id)
-      return catStats && catStats.completionPercentage === 100
-    }).map(c => c.dbName),
-    weakCategories: categoryStats.filter(c => c.bestScore < 70).map(c => c.dbName),
-    recentCategories: allSessions.slice(0, 5).map(s => s.category),
-    currentStreak,
-    averageScore: avgScore,
-    totalLessons: totalCompleted
-  }
+  const { level, xpInCurrentLevel } = getLevelAndXP()
 
   return (
     <div className="space-y-6">
-      {/* XP Gain Notification */}
-      {xpGain && (
-        <XPGainNotification 
-          xpAmount={xpGain.amount}
-          reason={xpGain.reason}
-          onComplete={() => setXpGain(null)}
-        />
-      )}
+      {/* Gamification Overlays */}
+      {xpGain && <XPGainNotification xpAmount={xpGain.amount} reason={xpGain.reason} onComplete={() => setXpGain(null)} />}
+      {showLevelUp && levelUpData && <LevelUpAnimation oldLevel={levelUpData.oldLevel} newLevel={levelUpData.newLevel} totalXP={levelUpData.totalXP} onClose={() => setShowLevelUp(false)} />}
+      {showAchievement && <AchievementPopup achievement={showAchievement} onClose={() => setShowAchievement(null)} />}
       
-      {/* Level Up Animation */}
-      {showLevelUp && levelUpData && (
-        <LevelUpAnimation
-          oldLevel={levelUpData.oldLevel}
-          newLevel={levelUpData.newLevel}
-          totalXP={levelUpData.totalXP}
-          onClose={() => setShowLevelUp(false)}
-        />
-      )}
-      
-      {/* Achievement Popup */}
-      {showAchievement && (
-        <AchievementPopup 
-          achievement={showAchievement} 
-          onClose={() => setShowAchievement(null)} 
-        />
-      )}
-      
-      {/* Hero Section - Level, Rank & Welcome */}
-      <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 rounded-2xl p-8 text-white shadow-xl">
-        <div className="flex items-center justify-between flex-wrap gap-6">
-          <div className="flex items-center gap-6">
-            {/* Level Ring */}
-            <LevelProgressRing 
-              level={level} 
-              xpInCurrentLevel={xpInCurrentLevel}
-              totalXP={totalXP}
-            />
-            
-            {/* Rank Badge */}
-            <RankBadge level={level} size="lg" showDescription={false} />
-            
-            {/* Welcome Text */}
-            <div>
-              <h2 className="text-3xl font-bold mb-2 flex items-center gap-3">
-                Welcome back! 👋
-              </h2>
-              <p className="text-white/90 text-lg mb-3">
-                {grade === null ? 'Grade not set' : (isMiddleSchool ? 'Middle School' : 'High School')} • Grade {grade ?? '—'}
-              </p>
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
-                  <span>🎯</span>
-                  <span className="font-bold">{totalCompleted} Lessons</span>
-                </div>
-                {currentStreak > 0 && (
-                  <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
-                    <span>🔥</span>
-                    <span className="font-bold">{currentStreak} Day Streak</span>
-                  </div>
-                )}
-              </div>
-            </div>
+      {/* Compact Stats Bar */}
+      <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 rounded-xl p-5 text-white">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h2 className="text-2xl font-bold mb-1">Welcome back! 👋</h2>
+            <p className="text-white/90 text-sm">
+              {isMiddleSchool ? 'Middle School' : 'High School'} • Grade {grade ?? '—'}
+            </p>
           </div>
           
-          {/* Quick Stats */}
-          <div className="flex gap-4">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center min-w-[100px]">
-              <div className="text-3xl font-bold">{overallPercentage}%</div>
-              <div className="text-xs text-white/80 mt-1">Progress</div>
+          <div className="flex gap-3">
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 text-center min-w-[80px]">
+              <div className="text-2xl font-bold">{level}</div>
+              <div className="text-xs text-white/80">Level</div>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center min-w-[100px]">
-              <div className="text-3xl font-bold">{avgScore || '-'}</div>
-              <div className="text-xs text-white/80 mt-1">Avg Score</div>
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 text-center min-w-[80px]">
+              <div className="text-2xl font-bold">{totalCompleted}</div>
+              <div className="text-xs text-white/80">Lessons</div>
             </div>
+            {currentStreak > 0 && (
+              <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 text-center min-w-[80px]">
+                <div className="text-2xl font-bold">🔥{currentStreak}</div>
+                <div className="text-xs text-white/80">Streak</div>
+              </div>
+            )}
+            {avgScore > 0 && (
+              <div className="bg-white/20 backdrop-blur-sm rounded-lg p-3 text-center min-w-[80px]">
+                <div className="text-2xl font-bold">{avgScore}</div>
+                <div className="text-xs text-white/80">Avg Score</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Rank Progress Bar */}
-      <RankProgressBar level={level} totalXP={totalXP} />
-
-      {/* Daily Quests & Challenges Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <DailyChallengeCard 
-          userId={user.id}
-          todaysSessions={todaysSessions.length}
-          todaysHighScore={todaysHighScore}
-          hasStreak={currentStreak > 0}
-        />
-        <DailyQuestsPanel 
-          userId={user.id}
-          grade={grade || 5}
-          userProgress={userProgressData}
-        />
-      </div>
-
-      {/* Power-Ups, Events & Leaderboard */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <PowerUpInventory userId={user.id} />
-        </div>
-        <WeeklyEventBanner />
-      </div>
-
-      <LeaderboardWidget userId={user.id} type="weekly_class" limit={5} />
-
-      {/* Progress Map */}
-      <ProgressMap 
-        userId={user.id}
-        grade={grade || 5}
-        categories={categoryStats}
-      />
-
-      {/* Artifact Gallery */}
-      <ArtifactGallery userId={user.id} />
-
-      {/* Categories */}
+      {/* MAIN FOCUS: Practice Categories */}
       <div>
         <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-          <span>🎯</span> Practice Categories
+          <span>🎯</span> Choose a Category to Practice
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {categoryStats.map((category: any) => (
             <Link key={category.id} href={`/category/${category.id}`} className="group">
-              <div className="bg-white rounded-2xl border-2 border-slate-200 hover:border-purple-400 hover:shadow-2xl transition-all duration-300 p-6 min-h-[220px] flex flex-col hover:-translate-y-1">
-                <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${category.color} flex items-center justify-center mb-4 text-3xl shadow-lg group-hover:scale-110 transition-transform flex-shrink-0`}>
+              <div className="bg-white rounded-xl border-2 border-slate-200 hover:border-purple-400 hover:shadow-xl transition-all duration-200 p-5 flex flex-col hover:-translate-y-1">
+                <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${category.color} flex items-center justify-center mb-3 text-2xl shadow-md group-hover:scale-110 transition-transform`}>
                   {category.icon}
                 </div>
                 
-                <h4 className="text-lg font-bold text-slate-900 mb-2 leading-tight flex-grow group-hover:text-purple-700 transition-colors">
+                <h4 className="text-base font-bold text-slate-900 mb-1 leading-tight group-hover:text-purple-700 transition-colors">
                   {category.name}
                 </h4>
                 
-                <p className="text-xs text-slate-600 mb-4">{category.description}</p>
+                <p className="text-xs text-slate-600 mb-3">{category.description}</p>
                 
-                <div className="flex items-center justify-between text-base mb-3">
-                  <span className="text-slate-600 font-medium text-sm">{category.completedLessons}/{category.totalLessons} lessons</span>
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <span className="text-slate-600 font-medium">{category.completedLessons}/{category.totalLessons} done</span>
                   {category.completionPercentage > 0 && (
-                    <span className="text-purple-600 font-bold text-lg">{category.completionPercentage}%</span>
+                    <span className="text-purple-600 font-bold">{category.completionPercentage}%</span>
                   )}
                 </div>
                 
-                <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+                <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
                   <div 
-                    className={`h-full bg-gradient-to-r ${category.color} rounded-full transition-all duration-500 shadow-lg`}
+                    className={`h-full bg-gradient-to-r ${category.color} rounded-full transition-all duration-500`}
                     style={{ width: `${category.completionPercentage}%` }}
                   />
                 </div>
-                
-                {category.bestScore > 0 && (
-                  <div className="mt-3 pt-3 border-t border-slate-200">
-                    <AchievementBadge score={category.bestScore} />
-                  </div>
-                )}
               </div>
             </Link>
           ))}
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <span>📜</span> Recent Practice
-          </h3>
-          <Link href="/history" className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold">
-            View All →
-          </Link>
-        </div>
-        <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden shadow-lg">
-          <div className="divide-y divide-slate-100">
-            {allSessions.slice(0, 5).map((session: any) => (
-              <div key={session.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="font-semibold text-slate-900 mb-1">{session.category}</div>
-                  <div className="text-xs text-slate-600">
-                    Module {session.module_number} • Lesson {session.level_number} • {new Date(session.created_at).toLocaleDateString()}
+      {/* Recent Activity - Compact */}
+      {allSessions.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <span>📜</span> Recent Practice
+            </h3>
+            <Link href="/history" className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold">
+              View All →
+            </Link>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="divide-y divide-slate-100">
+              {allSessions.slice(0, 5).map((session: any) => (
+                <div key={session.id} className="p-3 hover:bg-slate-50 transition-colors flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm text-slate-900">{session.category}</div>
+                    <div className="text-xs text-slate-600">
+                      Lesson {session.level_number} • {new Date(session.created_at).toLocaleDateString()}
+                    </div>
                   </div>
+                  <div className="text-xl font-bold text-purple-600">{session.overall_score || '-'}</div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-purple-600">{session.overall_score || '-'}</div>
-                  </div>
-                  {session.overall_score && (
-                    <AchievementBadge score={session.overall_score} />
-                  )}
-                </div>
-              </div>
-            ))}
-            {allSessions.length === 0 && (
-              <div className="p-8 text-center">
-                <div className="text-5xl mb-3">🎤</div>
-                <p className="text-slate-600 font-medium">No practice sessions yet!</p>
-                <p className="text-sm text-slate-500 mt-1">Start practicing to see your activity here</p>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
 // Main Dashboard Component
 export default function DashboardPage() {
-  const [user, setUser] = useState
-  <any>(null)
+  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isUserAdmin, setIsUserAdmin] = useState(false)
   const [grade, setGrade] = useState<number | null>(null)
@@ -565,13 +368,11 @@ export default function DashboardPage() {
 
         setUser(user)
         
-        // Check if admin or student
         const metaAccountType = user.user_metadata?.account_type
         const metaIsAdmin = user.user_metadata?.is_admin === true
         const isAdmin = metaIsAdmin || metaAccountType !== 'student'
         setIsUserAdmin(isAdmin)
 
-        // Get grade for students
         if (!isAdmin && metaAccountType === 'student') {
           const gradeValue = user.user_metadata?.grade || null
           setGrade(gradeValue ? parseInt(gradeValue) : null)
@@ -592,7 +393,7 @@ export default function DashboardPage() {
       <div className="min-h-screen w-full bg-gradient-to-tr from-[#edf2f7] to-[#f7f9fb] flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-purple-600 mb-4"></div>
-          <p className="text-lg font-semibold text-slate-700">Loading dashboard...</p>
+          <p className="text-lg font-semibold text-slate-700">Loading...</p>
         </div>
       </div>
     )
@@ -622,7 +423,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen w-full bg-gradient-to-tr from-[#edf2f7] to-[#f7f9fb] flex">
       {/* Sidebar */}
-      <aside className="hidden md:flex flex-col justify-between h-screen w-20 lg:w-56 sticky top-0 left-0 bg-white/80 backdrop-blur-xl border-r border-slate-200 shadow-sm">
+      <aside className="hidden md:flex flex-col justify-between h-screen w-20 lg:w-56 sticky top-0 left-0 bg-white/80 backdrop-blur-xl border-r border-slate-200">
         <div>
           <div className="px-3 py-4 flex items-center justify-center lg:justify-start gap-2">
             <img src="/Icon.png" alt="Locuta" className="w-8 h-8" />
@@ -669,14 +470,12 @@ export default function DashboardPage() {
         </header>
         
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="bg-white/80 backdrop-blur-xl rounded-xl shadow-lg px-4 sm:px-6 py-6 border border-slate-100">
-              {isUserAdmin ? (
-                <AdminDashboard user={user} />
-              ) : (
-                <StudentDashboard user={user} grade={grade} />
-              )}
-            </div>
+          <div className="max-w-6xl mx-auto">
+            {isUserAdmin ? (
+              <AdminDashboard user={user} />
+            ) : (
+              <StudentDashboard user={user} grade={grade} />
+            )}
           </div>
         </main>
       </div>
