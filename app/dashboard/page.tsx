@@ -165,28 +165,27 @@ function StudentDashboard({ user, grade }: { user: any, grade: number | null }) 
     { id: 'debate-advanced-persuasion', name: 'Debate', shortName: 'Debate', icon: '⚖️', gradient: 'from-indigo-600 to-violet-700', dbName: 'Debate & Advanced Persuasion', order: 6 }
   ]
 
-  // FIXED: Calculate stats properly
-  const categoryStats = categories.map(category => {
-    const categoryLessons = lessons?.filter((l: any) => l.category === category.dbName) || []
-    const totalLessons = categoryLessons.length
-    const categoryProgress = progress?.filter((p: any) => p.category === category.dbName) || []
-    const completedLessons = categoryProgress.filter((p: any) => p.completed).length
-    const completionPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
-    const bestScore = categoryProgress.length > 0 ? Math.max(...categoryProgress.map((p: any) => p.best_score || 0)) : 0
-    
-    // UNLOCK LOGIC: First category always unlocked, rest unlock when previous is 50% complete
-    const previousCategory = categories.find(c => c.order === category.order - 1)
-    let isUnlocked = category.order === 1 // First is always unlocked
-    
-    if (previousCategory && category.order > 1) {
-      const prevStats = categoryStats.find((cs: any) => cs.id === previousCategory.id)
-      if (prevStats && prevStats.completionPercentage >= 50) {
-        isUnlocked = true
-      }
-    }
+  // FIXED: Calculate stats properly WITHOUT unlock logic inside map
+const categoryStats = categories.map(category => {
+  const categoryLessons = lessons?.filter((l: any) => l.category === category.dbName) || []
+  const totalLessons = categoryLessons.length
+  const categoryProgress = progress?.filter((p: any) => p.category === category.dbName) || []
+  const completedLessons = categoryProgress.filter((p: any) => p.completed).length
+  const completionPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+  const bestScore = categoryProgress.length > 0 ? Math.max(...categoryProgress.map((p: any) => p.best_score || 0)) : 0
 
-    return { ...category, totalLessons, completedLessons, completionPercentage, bestScore, isUnlocked }
-  })
+  return { ...category, totalLessons, completedLessons, completionPercentage, bestScore, isUnlocked: false }
+})
+
+// UNLOCK LOGIC: Set unlock status AFTER all stats are created
+categoryStats.forEach((cat, index) => {
+  if (index === 0) {
+    cat.isUnlocked = true
+  } else {
+    const previousCat = categoryStats[index - 1]
+    cat.isUnlocked = previousCat.completionPercentage >= 50
+  }
+})
 
   const totalCompleted = progress?.filter((p: any) => p.completed).length || 0
   const currentStreak = calculateStreak(allSessions)
